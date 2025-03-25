@@ -1,0 +1,21 @@
+## Synopsis
+Practical Test 2 of Fundamentals of Programming COMP1005/5005
+
+## Contents
+.
+├── README
+├── buzz1.py # plot data using arrays instead of lists, green trees
+├── buzz2.py # ten random trees (contains overlaps)
+├── buzz3.py # 20 floaty random trees
+├── buzz4.py #20 floaty random trees + bar chart of distance to 20 trees
+└── history.txt
+
+1 directory, 6 files
+
+## Dependencies
+math - package for math used for sqrt
+matplotlib - graphing data
+numpy - random and generating arrays
+
+## Version Information
+25/03/25 - initial version of practical test 02 

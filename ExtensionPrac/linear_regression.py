@@ -1,0 +1,23 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# create random noise around a function
+
+m = int(input("Gradient: "))
+c = int(input("y-intercept: "))
+
+plt.xlim(0, 10)
+plt.plot([0,10],[c, (10*m + c)], label='function')
+
+def awesomessauce(valu):
+    return (m*valu+c)
+
+values = []
+x_values = []
+for i in range(10):
+    x_values.append(i + np.random.uniform(-1, 1))
+    values.append(awesomessauce(i) + np.random.uniform(-1, 1))
+
+plt.scatter(range(10), values)
+
+plt.show()
