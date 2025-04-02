@@ -1,0 +1,10 @@
+Welcome to the converter machine we will convert your numbers for a price of $0.00!
+What would you like convert? C-F (C), C-K (R), K-C (K), K-F (P), F-C (F), F-K (L) or Exit (X)
+Enter values or continue (C): Enter values or continue (C): Enter values or continue (C): Enter values or continue (C): 77.0
+86.0
+59.0
+What would you like convert? C-F (C), C-K (R), K-C (K), K-F (P), F-C (F), F-K (L) or Exit (X)
+Enter values or continue (C): Enter values or continue (C): Enter values or continue (C): -241.14999999999998
+-173.14999999999998
+What would you like convert? C-F (C), C-K (R), K-C (K), K-F (P), F-C (F), F-K (L) or Exit (X)
+Thanks for using our service!

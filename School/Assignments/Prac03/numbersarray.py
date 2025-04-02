@@ -15,6 +15,7 @@ for i in range(len(numarray)):
 max = numarray.max() 
 min = numarray.min()
 
+print("total is", numarray.sum())
 print('max and min is: ', max, min) 
 
 print('average is: ', numarray.sum()/10)
