@@ -1,7 +1,7 @@
 # Student Name: Thomas Han
 # Student ID:   22881119
 #
-# task2.py - add 4 more bees and made them yellow and title and label and also save as an image
+# task3.py - bluh
 #
 # Version information: 1 
 #
@@ -36,16 +36,30 @@ def plot_hive(hive, blist, ax):
     ax.set_title("Bee Hive")
     ax.set_ylabel("Y position")
 
+
+def plot_world(world, blist, ax):
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(world.T, origin="lower", cmap="tab20")
+    ax.scatter(xvalues, yvalues, color="y")
+
+    hive_position = [22, 20]
+    
+    ax.scatter(hive_position[0], hive_position[1], s=400, color="white", marker='s' )
+
+    ax.set_xlabel("X position")
+    ax.set_title("Property")
+    ax.set_ylabel("Y position")
+
 simlength = 1
 hiveX = 30
 hiveY = 25
-b1 = Bee("b1", (5,10))
-blist = [b1]
+blist = []
 
-blist.append(Bee("b2", (5,14))) 
-blist.append(Bee("b3", (5,18))) 
-blist.append(Bee("b4", (10,14))) 
-blist.append(Bee("b5", (10,18))) 
+blist.append(Bee("b1", (5,14)))
+blist.append(Bee("b2", (10,14))) 
+blist.append(Bee("b3", (5,10))) 
+
 
 # hive will range between 0 and 10
 # 10 is brown, not ready
@@ -60,17 +74,29 @@ for i in range(len(hive[14])):
 
 #plt.ion()
 
+# wow! look its the property
+propX=50
+propY=40
+world = np.full((propX,propY),5)
+world[0][0] = 19
+world[10:15,30:35]=14
+world[30:39, 5:10] = 0
+world[25:51:2, 20:40:2] = 12
+world[25, 20] = 2
+# world[20:24, 18:22] =15
+world[2:10:2, 2:5] = 4
+
 for t in range(simlength):
     for b in blist:
         b.step_change()
     fig, axes = plt.subplots(1, 2, figsize=(10,6))
     
     plot_hive(hive, blist, axes[0])
-    plot_hive(hive, blist, axes[1])
+    plot_world(world, blist[0:2], axes[1])
     fig.suptitle("BEE WORLD", size=48)
     
     plt.show()
     #plt.pause(1)
     #plt.clf()
  
-fig.savefig("task2.png") 
+fig.savefig("task3.png") 
