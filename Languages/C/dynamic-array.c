@@ -6,24 +6,28 @@
 // but it doesnt work for C so this is how you implement it. type shit.
 // c++ people use a vector
 
-Array my_array = array_init(sizeof(int), 64);
-array_append(&my_array, 23);
-// 2
-//
+int* arr;
+size_t arrSize = 256;
 
-int sum = 0;
-int smallest = INT_MAX;
-for (size_t i = 0; i < my_array.length; i += 1) {
-  int item = *(int *)array_at(&my_array, i);
-  uf (item < smallest) {
-    smallest = item;
-  }
+// 1) Do you need an array used in many othe rplaces
+// 2) Do you know the max amount of elements
+// 3) Is that max amount too big (and waste memory)
 
-  sum += item
-}
 
 
 int main(void) {
-  printf("Hello world");
+  arr = calloc(arrSize, sizeof(int));
+  if (arr == NULL) {
+    fprintf(stderr, "Array not allocated!");
+    return 1;
+  }
+
+  arr[10] = 17;
+  printf("Hello world %d\n", arr[10]);
+
+  arrSize *= 2;
+  arr = realloc(arr, arrSize * sizeof(int));
+
+  free(arr);
   return 0;
 }
