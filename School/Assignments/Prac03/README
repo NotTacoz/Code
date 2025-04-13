@@ -1,0 +1,22 @@
+# Synopsis
+practical 3 of fop comp 1005
+
+# Contents
+.
+├── dosage.py # dosage
+├── dosage4hr.py # dosage but every 4 hours
+├── growtharray.py - array of growth
+├── growthplot.py - growth plot
+├── growthsubplot.py # growth subplot
+├── numbersarray.py # input numbers -> array -> graph
+├── numbersbar.py # drawing input on bars
+├── rainbows.py # drawing a rainbow
+└── repeatdosage.py # repeating dosages
+
+# Dependencies
+matplotlib - very important usd for graphing
+numpy - for arrays and random idk if i did use random though
+math - for doing sqrt and stuff
+
+# version information
+1/4/25 - initial version type shii
