@@ -62,7 +62,8 @@ for i in range(len(hive[14])):
 
 for t in range(simlength):
     for b in blist:
-        b.step_change()
+        # b.step_change()
+        pass
     fig, axes = plt.subplots(1, 2, figsize=(10,6))
     
     plot_hive(hive, blist, axes[0])

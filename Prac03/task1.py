@@ -41,7 +41,8 @@ hive = np.zeros((hiveX,hiveY))
 
 for t in range(simlength):
     for b in blist:
-        b.step_change()
+        # b.step_change()
+        pass
     fig, axes = plt.subplots(1, 1, figsize=(10,6))
 
     plot_hive(hive, blist, axes)

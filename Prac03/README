@@ -1,0 +1,24 @@
+# Synopsis
+Prac Test 03 For COMP1005 Class uni.
+
+# Contents, Tree Structure
+├── __pycache__
+│   └── buzzness.cpython-311.pyc
+├── assignment.png
+├── buzzness.py
+├── task1.png
+├── task1.py
+├── task2.png
+├── task2.py
+├── task3.py
+├── task4.png
+├── README
+└── task4.py
+
+## dependencies
+matplotlib - for graphing and stuff
+random - for rqnadom moore cell
+math - more maths functions
+
+# todays date
+2025-04-13

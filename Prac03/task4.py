@@ -80,7 +80,7 @@ propY=40
 world = np.full((propX,propY),5)
 world[0][0] = 19
 world[10:15,30:35]=14
-world[30:39, 5:10] = 0
+world[30:40, 5:10] = 0
 world[25:51:2, 20:40:2] = 12
 world[25, 20] = 2
 # world[20:24, 18:22] =15
@@ -89,14 +89,15 @@ world[2:10:2, 2:5] = 4
 for t in range(simlength):
     for b in blist:
         b.step_change()
+        
     fig, axes = plt.subplots(1, 2, figsize=(10,6))
     
     plot_hive(hive, blist, axes[0])
     plot_world(world, blist[0:2], axes[1])
     fig.suptitle("BEE WORLD", size=48)
     
+    fig.savefig("task4.png") 
     plt.show()
     plt.pause(1)
     plt.clf()
 
-fig.savefig("task4.png") 

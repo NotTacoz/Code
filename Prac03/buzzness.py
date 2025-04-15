@@ -35,6 +35,7 @@ class Bee():
         move = random.choice(validmoves)       # randomly choose a move
         print(self.pos, move)
         # need to update the position based on the move
+        self.pos = [self.pos[0]+move[0], self.pos[1]+move[1]]
         
     def get_pos(self):
         return self.pos

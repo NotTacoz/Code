@@ -18,7 +18,7 @@ from buzzness import Bee
 def plot_hive(hive, blist, ax):
     xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
     yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
-    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr", vmin=0, vmax=10)
     ax.scatter(xvalues, yvalues, color="y")
     # ax.bar(14, 25, width=3, bottom=-0.5)
 
@@ -40,7 +40,7 @@ def plot_hive(hive, blist, ax):
 def plot_world(world, blist, ax):
     xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
     yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
-    ax.imshow(world.T, origin="lower", cmap="tab20")
+    ax.imshow(world.T, origin="lower", cmap="tab20", vmin=0, vmax=20)
     ax.scatter(xvalues, yvalues, color="y")
 
     hive_position = [22, 20]
@@ -60,6 +60,8 @@ blist.append(Bee("b1", (5,14)))
 blist.append(Bee("b2", (10,14))) 
 blist.append(Bee("b3", (5,10))) 
 
+blist.append(Bee("b4", (10,18))) 
+blist.append(Bee("b5", (5,18))) 
 
 # hive will range between 0 and 10
 # 10 is brown, not ready
@@ -80,7 +82,7 @@ propY=40
 world = np.full((propX,propY),5)
 world[0][0] = 19
 world[10:15,30:35]=14
-world[30:39, 5:10] = 0
+world[30:40, 5:10] = 0
 world[25:51:2, 20:40:2] = 12
 world[25, 20] = 2
 # world[20:24, 18:22] =15
@@ -88,11 +90,12 @@ world[2:10:2, 2:5] = 4
 
 for t in range(simlength):
     for b in blist:
-        b.step_change()
+        # b.step_change()
+        pass
     fig, axes = plt.subplots(1, 2, figsize=(10,6))
     
-    plot_hive(hive, blist, axes[0])
-    plot_world(world, blist[0:2], axes[1])
+    plot_hive(hive, blist[0:3], axes[0])
+    plot_world(world, blist[3:5], axes[1])
     fig.suptitle("BEE WORLD", size=48)
     
     plt.show()
