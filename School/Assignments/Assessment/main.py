@@ -25,6 +25,8 @@ def draw_background(size):
             maparr[i][j] = pnoise2(i/size, j/size, 5)
 
             c = round(255 * ((maparr[i][j])+1)/2)
+            if c < 150:
+                c = 0
 
             print(c)
             
