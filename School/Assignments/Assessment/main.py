@@ -26,7 +26,7 @@ def draw_background(size):
     mult = 6
     for i in range(len(maparr)):
         for j in range(len(maparr[i])):
-            pno = pnoise2((i+x_offset)*mult/size, (j+y_offset)*mult/size, 50)
+            pno = pnoise2((i+x_offset)*mult/size, (j+y_offset)*mult/size, 8)
             pno = (pno+1)/2
             maparr[i][j] = pno
             test.append(maparr[i][j])
