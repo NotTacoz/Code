@@ -25,14 +25,14 @@ class CameraGroup(pygame.sprite.Group):
 np.set_printoptions(threshold=sys.maxsize)
 
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
-WORLD_SIZE = 1024
+WORLD_SIZE = 4096
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 clock = pygame.time.Clock()
 pygame.event.set_grab(True)
 
-camera_offset = pygame.Vector2(500,500)
+camera_offset = pygame.Vector2(0,0)
 
 background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
 background_surface.fill((50,50,50))
@@ -54,30 +54,31 @@ def check_mouse_movement():
 
 
     if mouse.y <= 0:
-        mouse_offset.y = -5
+        mouse_offset.y = -25
     elif mouse.y >= WINDOW_HEIGHT - 1:
-        mouse_offset.y = 5
+        mouse_offset.y = 25
     
     if mouse.x == 0:
-        mouse_offset.x = -5
+        mouse_offset.x = -25
     elif mouse.x >= WINDOW_WIDTH - 1:
-        mouse_offset.x = 5
+        mouse_offset.x = 25
 
     camera_offset += mouse_offset
 
 def get_sigmoid(x):
     return (1/(1+math.exp(-x)))
 
-
+maparr = []
 
 def draw_background(size):
     test = []
     x_offset = random.uniform(0,10000)
     y_offset = random.uniform(0,10000)
     # print("drawing background")
+    global maparr
     maparr = np.zeros((size,size), dtype=float)
     mult = 6
-    scale = 8
+    scale = WORLD_SIZE/size
     for i in range(len(maparr)):
         for j in range(len(maparr[i])):
             pno = pnoise2((i+x_offset)*mult/size, (j+y_offset)*mult/size, 8)
@@ -85,6 +86,37 @@ def draw_background(size):
             maparr[i][j] = pno
             test.append(maparr[i][j])
 
+    update_background(size)
+            # square.fill(col)
+            # pixel_draw = pygame.Rect(5*(i+1), 5*(j+1), 15, 15)
+            # screen.blit(square, pixel_draw)
+    print(np.mean(test))
+    # pygame.draw.circle(screen, "black", (30, 30), 500)
+    # print(maparr)
+
+def update_background(size):
+    scale = WORLD_SIZE/size
+    # print(maparr)
+    start_col = math.floor(camera_offset.x / scale)
+    end_col = math.ceil((WINDOW_WIDTH + camera_offset.x) / scale)
+    start_row = math.floor((camera_offset.y) / scale)
+    end_row = math.ceil((camera_offset.y + WINDOW_HEIGHT) / scale)
+
+    #world bound
+    start_col = max(0,start_col)
+    end_col = min(size, end_col)
+    start_row = max(0, start_row)
+    end_row = min(size, end_row)
+
+    # print(start_col, end_col, start_row, end_row)
+
+    # print(math.ceil(WINDOW_HEIGHT/scale))
+
+    for i in range(start_col,end_col):
+        for j in range(start_row, end_row):
+            # print(i,j)
+            # print(math.ceil(WINDOW_HEIGHT/scale))
+            pno = maparr[i][j]
             c = round(255 * (pno**1.1))
             fav = round(255 * (pno**0.5))
 
@@ -95,38 +127,42 @@ def draw_background(size):
             else:
                 col = (c,fav,c)
 
+            pos = pygame.Vector2(i, j)
+            mouse = pygame.math.Vector2(pygame.mouse.get_pos())
+            # print(camera_offset)
+            pos_scaled = pos * scale - camera_offset
 
-            # print(col)
-            pygame.draw.rect(background_surface, col, (i*scale, j*scale, scale, scale), 2)
-    
-            # square.fill(col)
-            # pixel_draw = pygame.Rect(5*(i+1), 5*(j+1), 15, 15)
-            # screen.blit(square, pixel_draw)
-    print(np.mean(test))
-    # pygame.draw.circle(screen, "black", (30, 30), 500)
-    # print(maparr)
+            # print(pos_scaled, mouse)
+            
+            # print(camera_offset)
 
+            # print(scaled_x, scaled_y)
+            
+
+            # pygame.draw.rect(background_surface, col, (500, 500, 50, 50))
+            pygame.draw.rect(background_surface, col, (pos_scaled.x, pos_scaled.y, scale, scale))
 
 def main():
     screen.fill("white")
-    draw_background(128)
 
+    draw_background(128)
     
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running=False
+        screen.fill((50, 50, 50))
 
         camera_offset.x = max(0, min(camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
         camera_offset.y = max(0, min(camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
         
         check_mouse_movement()
-        test_area = pygame.Rect(int(camera_offset.x), int(camera_offset.y), WINDOW_WIDTH, WINDOW_HEIGHT)
+        test_area = pygame.Rect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         screen.blit(background_surface, (0,0), area=test_area)
         # pygame.draw.circle(screen, "black", (30, 30), 500)
 
-        camera_group.update()
+        update_background(128)
 
         pygame.display.flip()
         clock.tick(60)
