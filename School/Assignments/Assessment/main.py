@@ -13,6 +13,12 @@ screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 clock = pygame.time.Clock()
 square = pygame.Surface((15,15))
 
+# camera
+class CameraGroup(pygame.sprite.Group):
+    def __init__(self):
+        super().__init__()
+camera_group = pygame.sprite.Group()
+
 def get_sigmoid(x):
     return (1/(1+math.exp(-x)))
 
@@ -43,7 +49,7 @@ def draw_background(size):
 
 
             # print(col)
-            
+    
             square.fill(col)
             pixel_draw = pygame.Rect(5*(i+1), 5*(j+1), 15, 15)
             screen.blit(square, pixel_draw)
@@ -51,6 +57,24 @@ def draw_background(size):
     print(np.mean(test))
     # pygame.draw.circle(screen, "black", (30, 30), 500)
     # print(maparr)
+
+def mouse_control(self):
+    mouse = pygame.math.Vector2(pygame.math.get_pos())
+    mouse_offset_vector = pygame.math.Vector2()
+
+    # set up camera borders
+    left_border = self.camera_borders['left']
+    top_border = self.camera_borders['top'] 
+    right_border = self.display_surface.get_size()[0] - self.camera_borders['right']
+    bottom_border = self.display_surface.get_size()[1] - self.camera_borders['bottom']
+
+    # 
+    if top_border < mouse.y < bottom_border:
+        if mouse.x < left_border:
+            mouse_offset_vector.x = mouse.x - left_border
+            pygame.mouse.set_pos((left_border,mouse.y))
+
+    self.offset += mouse_offset_vector
 
 def main():
     screen.fill("white")
