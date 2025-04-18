@@ -25,20 +25,49 @@ class CameraGroup(pygame.sprite.Group):
 np.set_printoptions(threshold=sys.maxsize)
 
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
+WORLD_SIZE = 1024
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 clock = pygame.time.Clock()
 pygame.event.set_grab(True)
 
+camera_offset = pygame.Vector2(500,500)
 
 background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
 background_surface.fill((50,50,50))
 
 camera_group = pygame.sprite.Group()
 
+def check_mouse_movement():
+    global camera_offset
+    
+    mouse = pygame.math.Vector2(pygame.mouse.get_pos())
+
+    mouse_offset = pygame.Vector2(0,0)
+
+    # # set up camera borders
+    # left_border = self.camera_borders['left']
+    # top_border = self.camera_borders['top'] 
+    # right_border = self.display_surface.get_size()[0] - self.camera_borders['right']
+    # bottom_border = self.display_surface.get_size()[1] - self.camera_borders['bottom']
+
+
+    if mouse.y <= 0:
+        mouse_offset.y = -5
+    elif mouse.y >= WINDOW_HEIGHT - 1:
+        mouse_offset.y = 5
+    
+    if mouse.x == 0:
+        mouse_offset.x = -5
+    elif mouse.x >= WINDOW_WIDTH - 1:
+        mouse_offset.x = 5
+
+    camera_offset += mouse_offset
+
 def get_sigmoid(x):
     return (1/(1+math.exp(-x)))
+
 
 
 def draw_background(size):
@@ -48,7 +77,7 @@ def draw_background(size):
     # print("drawing background")
     maparr = np.zeros((size,size), dtype=float)
     mult = 6
-    scale = 6
+    scale = 8
     for i in range(len(maparr)):
         for j in range(len(maparr[i])):
             pno = pnoise2((i+x_offset)*mult/size, (j+y_offset)*mult/size, 8)
@@ -77,30 +106,11 @@ def draw_background(size):
     # pygame.draw.circle(screen, "black", (30, 30), 500)
     # print(maparr)
 
-def mouse_control(self):
-    mouse = pygame.math.Vector2(pygame.math.get_pos())
-    mouse_offset_vector = pygame.math.Vector2()
-
-    # set up camera borders
-    left_border = self.camera_borders['left']
-    top_border = self.camera_borders['top'] 
-    right_border = self.display_surface.get_size()[0] - self.camera_borders['right']
-    bottom_border = self.display_surface.get_size()[1] - self.camera_borders['bottom']
-
-    # 
-    if top_border < mouse.y < bottom_border:
-        if mouse.x < left_border:
-            mouse_offset_vector.x = mouse.x - left_border
-            pygame.mouse.set_pos((left_border,mouse.y))
-
-    self.offset += mouse_offset_vector
 
 def main():
     screen.fill("white")
-    draw_background(100)
+    draw_background(128)
 
-    test_area = pygame.Rect(50, 50, 1280, 720)
-    screen.blit(background_surface, (0,0), area=test_area)
     
     running = True
     while running:
@@ -108,6 +118,12 @@ def main():
             if event.type == pygame.QUIT:
                 running=False
 
+        camera_offset.x = max(0, min(camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
+        camera_offset.y = max(0, min(camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
+        
+        check_mouse_movement()
+        test_area = pygame.Rect(int(camera_offset.x), int(camera_offset.y), WINDOW_WIDTH, WINDOW_HEIGHT)
+        screen.blit(background_surface, (0,0), area=test_area)
         # pygame.draw.circle(screen, "black", (30, 30), 500)
 
         camera_group.update()
