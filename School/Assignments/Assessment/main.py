@@ -24,13 +24,28 @@ mouse = pygame.Vector2(0,0)
 background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
 background_surface.fill((50,50,50))
 
+
+class Simulation():
+    def __init__(self):
+        self.creatures = []
+
+    def add(self,creature):
+        self.creatures.append(creature)
+
+    def remove(self,creature):
+        self.creatures.remove(creature)
+
+    def run(self):
+        for creature in self.creatures[:]:
+            creature.update(self)
+
 class Creature():
     def __init__(self, x, y):
         self.pos = pygame.Vector2(x, y) #change pos later 
         
         self.energy = 100
 
-        self.angle = 0
+        self.sensors = [[0, 5], [50, 7]]
 
 
         # Potential Inputs:
@@ -39,29 +54,52 @@ class Creature():
 
         # Outputs
         # Acceleration
-    def draw(self):
+
+    def update(self, manager):
         global mouse
 
-        if frames % 60 == 0:
+        if frames % 60 == 0: 
             self.energy = self.energy - 1
-            # print(self.energy)
+            print(self.energy)
+
+        if self.energy <= 90:
+            manager.remove(self)
+
         self.size_raw = self.energy/500
 
-        scaled = WORLD_SIZE/MAP_SIZE
-        size_scaled = self.size_raw * scaled*2
+        self.scaled = WORLD_SIZE/MAP_SIZE
+        self.size_scaled = self.size_raw * self.scaled*2
 
-        real_pos = pygame.Vector2(self.pos.x*scaled-camera_offset.x, self.pos.y *scaled - camera_offset.y)
+        self.screen_pos = pygame.Vector2(self.pos.x*self.scaled-camera_offset.x, self.pos.y *self.scaled - camera_offset.y) # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
 
-        col = (0,0,0)
+        self.col = (0,0,0)
 
-        if (real_pos.x - size_scaled < mouse.x < real_pos.x + size_scaled) and (real_pos.y - size_scaled < mouse.y < real_pos.y + size_scaled):
-            col = (0,255,0)
+        if (self.screen_pos.x - self.size_scaled < mouse.x < self.screen_pos.x + self.size_scaled) and (self.screen_pos.y - self.size_scaled < mouse.y < self.screen_pos.y + self.size_scaled):
+            self.col = (0,255,0)
+
+        self.draw()
+
+    def draw(self):
         
         ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, col, (self.pos.x*scaled-camera_offset.x, self.pos.y*scaled-camera_offset.y), size_scaled, int(scaled/8))
+        pygame.draw.circle(screen, self.col, self.screen_pos, self.size_scaled, int(self.scaled/8))
 
+        # drawing creature's ""eyes""
+        for i in self.sensors:
+            angle = np.deg2rad(i[0])
+            distance = i[1]
+            distance_added = pygame.Vector2(distance*np.cos(angle), distance*np.sin(angle))
+            
+
+            pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*self.scaled, width=2)
+
+
+
+
+sim = Simulation()
 test_guy = Creature(5, 4.5)
+sim.add(test_guy)
 
 def check_mouse_movement():
     global camera_offset
@@ -209,8 +247,9 @@ def main():
         test_area = pygame.Rect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         screen.fill((50,50,50))
         screen.blit(background_surface, (0,0), area=test_area)
-        test_guy.draw()
         # pygame.draw.circle(screen, "black", (30, 30), 500)
+
+        sim.run()
 
 
 
