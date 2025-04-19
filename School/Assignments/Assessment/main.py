@@ -26,6 +26,8 @@ np.set_printoptions(threshold=sys.maxsize)
 
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
 WORLD_SIZE = 4096
+MAP_SIZE = 128
+SCALED = WORLD_SIZE/MAP_SIZE
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -145,24 +147,34 @@ def update_background(size):
 def main():
     screen.fill("white")
 
-    draw_background(128)
+    draw_background(MAP_SIZE)
     
     running = True
     while running:
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running=False
+            if event.type == pygame.KEYDOWN:
+                global WORLD_SIZE
+                if event.key == pygame.K_EQUALS:
+                    # print("awesome")
+                    WORLD_SIZE = WORLD_SIZE * 2
+                if event.key == pygame.K_MINUS:
+                    WORLD_SIZE = WORLD_SIZE /2
+
         screen.fill((50, 50, 50))
 
         camera_offset.x = max(0, min(camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
         camera_offset.y = max(0, min(camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
+
         
         check_mouse_movement()
         test_area = pygame.Rect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         screen.blit(background_surface, (0,0), area=test_area)
         # pygame.draw.circle(screen, "black", (30, 30), 500)
 
-        update_background(128)
+        update_background(MAP_SIZE)
 
         pygame.display.flip()
         clock.tick(60)
