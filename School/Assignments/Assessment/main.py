@@ -19,6 +19,7 @@ clock = pygame.time.Clock()
 pygame.event.set_grab(True)
 
 camera_offset = pygame.Vector2(0,0)
+mouse = pygame.Vector2(0,0)
 
 background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
 background_surface.fill((50,50,50))
@@ -29,6 +30,9 @@ class Creature():
         
         self.energy = 100
 
+        self.angle = 0
+
+
         # Potential Inputs:
         # Energy
         # Velocity
@@ -36,19 +40,32 @@ class Creature():
         # Outputs
         # Acceleration
     def draw(self):
+        global mouse
+
         if frames % 60 == 0:
             self.energy = self.energy - 1
             # print(self.energy)
         self.size_raw = self.energy/500
+
         scaled = WORLD_SIZE/MAP_SIZE
         size_scaled = self.size_raw * scaled*2
+
+        real_pos = pygame.Vector2(self.pos.x*scaled-camera_offset.x, self.pos.y *scaled - camera_offset.y)
+
+        col = (0,0,0)
+
+        if (real_pos.x - size_scaled < mouse.x < real_pos.x + size_scaled) and (real_pos.y - size_scaled < mouse.y < real_pos.y + size_scaled):
+            col = (0,255,0)
+        
+        ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, (0,0,0), (self.pos.x*scaled-camera_offset.x, self.pos.y*scaled-camera_offset.y), size_scaled)
+        pygame.draw.circle(screen, col, (self.pos.x*scaled-camera_offset.x, self.pos.y*scaled-camera_offset.y), size_scaled, int(scaled/8))
 
 test_guy = Creature(5, 4.5)
 
 def check_mouse_movement():
     global camera_offset
+    global mouse
     
     mouse = pygame.math.Vector2(pygame.mouse.get_pos())
 
