@@ -122,12 +122,17 @@ def update_background(size):
             c = round(255 * (pno**1.1))
             fav = round(255 * (pno**0.5))
 
+
             if c >= 130:
                 col = (c-50, c-50, fav)
             elif 120 < c <= 129:
                 col = (fav, fav, c)
             else:
                 col = (c,fav,c)
+            
+
+            s = 0.5
+            border = (int(col[0]*s),int(col[1]*s), int(col[2]*s) )
 
             pos = pygame.Vector2(i, j)
             mouse = pygame.math.Vector2(pygame.mouse.get_pos())
@@ -143,6 +148,9 @@ def update_background(size):
 
             # pygame.draw.rect(background_surface, col, (500, 500, 50, 50))
             pygame.draw.rect(background_surface, col, (pos_scaled.x, pos_scaled.y, scale, scale))
+
+            if scale > 8:
+                pygame.draw.rect(background_surface, border, (pos_scaled.x, pos_scaled.y, scale, scale), 1)
 
 def main():
     screen.fill("white")
@@ -163,18 +171,22 @@ def main():
                 if event.key == pygame.K_MINUS:
                     WORLD_SIZE = WORLD_SIZE /2
 
-        screen.fill((50, 50, 50))
+
 
         camera_offset.x = max(0, min(camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
         camera_offset.y = max(0, min(camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
 
         
+        background_surface.fill((50,50,50))
         check_mouse_movement()
+        update_background(MAP_SIZE)
+
         test_area = pygame.Rect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
+        screen.fill((50,50,50))
         screen.blit(background_surface, (0,0), area=test_area)
         # pygame.draw.circle(screen, "black", (30, 30), 500)
 
-        update_background(MAP_SIZE)
+
 
         pygame.display.flip()
         clock.tick(60)
