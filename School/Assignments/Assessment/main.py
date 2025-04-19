@@ -62,7 +62,8 @@ class Creature():
             self.energy = self.energy - 1
             print(self.energy)
 
-        if self.energy <= 90:
+        if self.energy <= 0:
+            print("creature ran out of energy :(")
             manager.remove(self)
 
         self.size_raw = self.energy/500
