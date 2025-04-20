@@ -5,29 +5,59 @@ import math
 import sys
 from noise import pnoise2
 
-
-np.set_printoptions(threshold=sys.maxsize)
-
+# Constants
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
 WORLD_SIZE = 4096
 MAP_SIZE = 128
 
+## New and Improved Updated Constants
+# Map
+WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
+INITIAL_WORLD_SIZE = 4096
+MAP_SIZE = 128
+
+# Colors
+BACKGROUND_FILL = (50,50,50)
+CR_HOVER_COLOR = (0, 255, 0)
+SENSOR_COLOR = (255, 0, 0)
+
+# Camera
+CA_SCROLL_SPEED = 30
+CA_BORDER_MARGIN = 5
+
+# Creature
+CR_INITIAL_ENERGY = 100 # initial energy of a new creature (might change this into a output? who knows)
+CR_ENERGY_DECAY = 1 # ts is energy lost per second
+
+# Bg
+B_NOISE_OCTAVE = 8 # noise octave for perlin noise gen
+B_NOISE_SCALE = 4 # zoom of onise
+B_WATER_THRESH = 130/255 # Water
+B_SAND_THRESH = 120/255 # threshould for smth to be considered sand
+B_COLFULEXP = 0.5 ## exponent to make shit more colourful
+B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff tbh)
+B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
+B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
+
+# hive constant
+H_INITIAL_WORKERS = 10
+H_INITIAL_QUEENS = 1
+
+scaled = INITIAL_WORLD_SIZE/MAP_SIZE
+
+# FLOWERS
+F_SIZE = 8 # unscaled
+
+## INITIALISATION !!!
 pygame.init()
-frames = 0
-screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-clock = pygame.time.Clock()
-pygame.event.set_grab(True)
+# np.set_printoptions(threshold=sys.maxsize) # Make print np arrays more comprehensive
 
-camera_offset = pygame.Vector2(0,0)
-mouse = pygame.Vector2(0,0)
-
-background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
-background_surface.fill((50,50,50))
-
-
+ 
 class Simulation():
     def __init__(self):
         self.creatures = []
+        self.hives = []
+        self.flowers = []
 
     def add(self,creature):
         self.creatures.append(creature)
@@ -35,9 +65,77 @@ class Simulation():
     def remove(self,creature):
         self.creatures.remove(creature)
 
+    def add_hive(self, hive):
+        self.hives.append(hive)
+
+    def rem_hive(self, hive):
+        self.hives.remove(hive)
+
+    def add_flo(self, flower):
+        self.hives.append(flower)
+
+    def rem_flo(self, flower):
+        self.flowers.remove(flower)
+
     def run(self):
         for creature in self.creatures[:]:
             creature.update(self)
+        for hive in self.hives[:]:
+            hive.update(self)
+
+class Flower():
+    def __init__(self,x,y):
+        self.pos=pygame.Vector2(x,y)
+
+        self.size = F_SIZE
+        self.petalCol = (random.randint(100,255), 255, random.randint(100,255))
+
+        self.angle = 0 # initial angle
+        self.rotspeed = 0.005 # rotational speed
+    
+    def update(self, manager):
+        self.angle += self.rotspeed
+        self.draw()
+
+    def draw(self):
+        screen_pos = gridpos2screen(self.pos)
+
+        # petalCount = 6 # temp petalcount
+        #
+        # for i in range(petalCount):
+        #     angle = i/petalCount * 2 * math.pi
+        #
+        #     offset_dist = scaled
+        #
+        #     offset_petal = pygame.Vector2(offset_dist * math.cos(angle), offset_dist*math.sin(angle))
+        #
+        #     draw_pos = screen_pos + offset_petal
+        #
+        #     pygame.draw.ellipse(screen, self.petalCol, (draw_pos.x, draw_pos.y, 0.5*scaled, 1.2*scaled))
+        #
+        pygame.draw.circle(screen, self.petalCol, (screen_pos), scaled/3)
+
+
+class Hive():
+    def __init__(self,x,y):
+        self.pos=pygame.Vector2(x,y)
+
+        self.workerspop = H_INITIAL_WORKERS
+        self.queenpop = H_INITIAL_QUEENS
+
+    def update(self, manager):
+        self.size = self.workerspop + self.queenpop
+        
+
+        self.draw()
+
+    def draw(self):
+        global mouse
+        global scaled
+
+        screen_pos = gridpos2screen(self.pos)
+
+        pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x, screen_pos.y, self.size * scaled, self.size * scaled))
 
 class Creature():
     def __init__(self, x, y):
@@ -46,6 +144,7 @@ class Creature():
         self.energy = 100
 
         self.sensors = [[0, 5], [50, 7]]
+
 
 
         # Potential Inputs:
@@ -57,10 +156,11 @@ class Creature():
 
     def update(self, manager):
         global mouse
+        global scaled
 
         if frames % 60 == 0: 
             self.energy = self.energy - 1
-            print(self.energy)
+            # print(self.energy)
 
         if self.energy <= 0:
             print("creature ran out of energy :(")
@@ -68,39 +168,63 @@ class Creature():
 
         self.size_raw = self.energy/500
 
-        self.scaled = WORLD_SIZE/MAP_SIZE
-        self.size_scaled = self.size_raw * self.scaled*2
+        self.size_scaled = self.size_raw * scaled*2
 
-        self.screen_pos = pygame.Vector2(self.pos.x*self.scaled-camera_offset.x, self.pos.y *self.scaled - camera_offset.y) # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
+        self.screen_pos = gridpos2screen(self.pos)
+        # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
 
         self.col = (0,0,0)
-
-        if (self.screen_pos.x - self.size_scaled < mouse.x < self.screen_pos.x + self.size_scaled) and (self.screen_pos.y - self.size_scaled < mouse.y < self.screen_pos.y + self.size_scaled):
+            
+        # this is a terrible (and long line of code). hover code.
+        # if (-self.size_scaled < mouse.x - self.screen_pos.x <  self.size_scaled) and (-self.size_scaled < mouse.y - self.screen_pos.y < self.size_scaled):
+        #     self.col = (0,255,0)
+        if (is_hovered(self.size_scaled, self.size_scaled, self.screen_pos)):
             self.col = (0,255,0)
 
         self.draw()
 
     def draw(self):
-        
         ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, self.col, self.screen_pos, self.size_scaled, int(self.scaled/8))
+        pygame.draw.circle(screen, self.col, self.screen_pos, self.size_scaled, int(scaled/8))
 
         # drawing creature's ""eyes""
         for i in self.sensors:
             angle = np.deg2rad(i[0])
             distance = i[1]
             distance_added = pygame.Vector2(distance*np.cos(angle), distance*np.sin(angle))
-            
 
-            pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*self.scaled, width=2)
+
+            pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*scaled, width=2)
 
 
 
 
 sim = Simulation()
 test_guy = Creature(5, 4.5)
+test_hive = Hive(10,10)
+test_flower = Flower(2.5,2.5)
 sim.add(test_guy)
+sim.add_hive(test_hive)
+sim.add_flo(test_flower)
+
+def is_hovered(screen_width, screen_height, screen_pos):
+    global mouse
+    # this is a terrible (and long line of code). hover code.
+    if (-screen_width < mouse.x - screen_pos.x <  screen_width) and (-screen_height < mouse.y - screen_pos.y < screen_height):
+        return True
+    else:
+        return False
+
+
+def gridpos2screen(x):
+    global scaled, camera_offset
+    # print(MAP_SIZE) # should be 128x128 by default
+    return (x * scaled - camera_offset)
+    
+def screenpos2grid(x):
+    global scaled, camera_offset
+    return ((x+camera_offset)/scaled)
 
 def check_mouse_movement():
     global camera_offset
@@ -141,11 +265,9 @@ def draw_background(size):
     # print("drawing background")
     global maparr
     maparr = np.zeros((size,size), dtype=float)
-    mult = 6
-    scale = WORLD_SIZE/size
     for i in range(len(maparr)):
         for j in range(len(maparr[i])):
-            pno = pnoise2((i+x_offset)*mult/size, (j+y_offset)*mult/size, 8)
+            pno = pnoise2((i+x_offset)*B_NOISE_SCALE/size, (j+y_offset)*B_NOISE_SCALE/size, 8)
             pno = (pno+1)/2
             maparr[i][j] = pno
             test.append(maparr[i][j])
@@ -159,12 +281,12 @@ def draw_background(size):
     # print(maparr)
 
 def update_background(size):
-    scale = WORLD_SIZE/size
+    global scaled
     # print(maparr)
-    start_col = math.floor(camera_offset.x / scale)
-    end_col = math.ceil((WINDOW_WIDTH + camera_offset.x) / scale)
-    start_row = math.floor((camera_offset.y) / scale)
-    end_row = math.ceil((camera_offset.y + WINDOW_HEIGHT) / scale)
+    start_col = math.floor(camera_offset.x / scaled)
+    end_col = math.ceil((WINDOW_WIDTH + camera_offset.x) / scaled)
+    start_row = math.floor((camera_offset.y) / scaled)
+    end_row = math.ceil((camera_offset.y + WINDOW_HEIGHT) / scaled)
 
     #world bound
     start_col = max(0,start_col)
@@ -174,12 +296,12 @@ def update_background(size):
 
     # print(start_col, end_col, start_row, end_row)
 
-    # print(math.ceil(WINDOW_HEIGHT/scale))
+    # print(math.ceil(WINDOW_HEIGHT/scaled))
 
     for i in range(start_col,end_col):
         for j in range(start_row, end_row):
             # print(i,j)
-            # print(math.ceil(WINDOW_HEIGHT/scale))
+            # print(math.ceil(WINDOW_HEIGHT/scaled))
             pno = maparr[i][j]
             c = round(255 * (pno**1.1))
             fav = round(255 * (pno**0.5))
@@ -199,8 +321,8 @@ def update_background(size):
             pos = pygame.Vector2(i, j)
             mouse = pygame.math.Vector2(pygame.mouse.get_pos())
             # print(camera_offset)
-            pos_scaled = pos * scale - camera_offset
-
+            pos_scaled = gridpos2screen(pos)
+            
             # print(pos_scaled, mouse)
             
             # print(camera_offset)
@@ -209,14 +331,25 @@ def update_background(size):
             
 
             # pygame.draw.rect(background_surface, col, (500, 500, 50, 50))
-            pygame.draw.rect(background_surface, col, (pos_scaled.x, pos_scaled.y, scale, scale))
+            pygame.draw.rect(background_surface, col, (pos_scaled.x, pos_scaled.y, scaled, scaled))
 
-            if scale > 8:
-                pygame.draw.rect(background_surface, border, (pos_scaled.x, pos_scaled.y, scale, scale), 1)
+            if scaled > 8:
+                pygame.draw.rect(background_surface, border, (pos_scaled.x, pos_scaled.y, scaled, scaled), 1)
+
+frames = 0
+screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+clock = pygame.time.Clock()
+pygame.event.set_grab(True)
+
+camera_offset = pygame.Vector2(0,0)
+mouse = pygame.Vector2(0,0)
+
+background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+background_surface.fill(BACKGROUND_FILL)
+screen.fill("white")
 
 def main():
-    screen.fill("white")
-
+    global scaled
     draw_background(MAP_SIZE)
     running = True
     while running:
@@ -229,8 +362,10 @@ def main():
                 if event.key == pygame.K_EQUALS:
                     # print("awesome")
                     WORLD_SIZE = min(WORLD_SIZE * 2, 16384)
+                    scaled = WORLD_SIZE/MAP_SIZE
                 if event.key == pygame.K_MINUS:
                     WORLD_SIZE = max(512, WORLD_SIZE / 2)
+                    scaled = WORLD_SIZE/MAP_SIZE
         
         global frames
         frames += 1
