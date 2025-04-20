@@ -72,7 +72,7 @@ class Simulation():
         self.hives.remove(hive)
 
     def add_flo(self, flower):
-        self.hives.append(flower)
+        self.flowers.append(flower)
 
     def rem_flo(self, flower):
         self.flowers.remove(flower)
@@ -80,6 +80,7 @@ class Simulation():
     def run(self):
         for creature in self.creatures[:]:
             creature.update(self)
+            creature.seekFlowers(self.flowers)
         for hive in self.hives[:]:
             hive.update(self)
 
@@ -143,20 +144,45 @@ class Creature():
         
         self.energy = 100
 
-        self.sensors = [[0, 5], [50, 7]]
+        self.honey = 0
 
+        self.angle = 0
 
+        # self.sensors = [[0, 5], [50, 7]]
 
-        # Potential Inputs:
-        # Energy
-        # Velocity
+        self.velocity = pygame.Vector2((random.random()/5), (random.random()/5))
 
-        # Outputs
-        # Acceleration
+        self.acceleration = pygame.Vector2(0,0)
+
+        self.color = (random.randint(170,255), random.randint(170,255), random.randint(0,50))
+
+        self.seeking_honey = True
+
+        self.closestflowerpos = pygame.Vector2(999, 999)
 
     def update(self, manager):
         global mouse
         global scaled
+
+        max_speed = 5
+
+        self.pos += self.velocity
+
+        self.velocity += self.acceleration
+
+        speed = pygame.math.Vector2.magnitude(self.velocity)
+        if speed > max_speed:
+            self.velocity = (5,5)
+
+        self.acceleration = pygame.Vector2(0,0)
+
+        self.whatamidoing()
+
+        self.calculateForces() # calculates all the forces to do/add
+
+        # seeking flower code
+
+        ## idk anymore
 
         if frames % 60 == 0: 
             self.energy = self.energy - 1
@@ -172,31 +198,44 @@ class Creature():
 
         self.screen_pos = gridpos2screen(self.pos)
         # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
-
-        self.col = (0,0,0)
-            
-        # this is a terrible (and long line of code). hover code.
-        # if (-self.size_scaled < mouse.x - self.screen_pos.x <  self.size_scaled) and (-self.size_scaled < mouse.y - self.screen_pos.y < self.size_scaled):
-        #     self.col = (0,255,0)
         if (is_hovered(self.size_scaled, self.size_scaled, self.screen_pos)):
-            self.col = (0,255,0)
+            self.color = (0,255,0)
 
         self.draw()
 
+    def applyForce(self, force):
+        self.acceleration = force
+
+    def whatamidoing(self):
+        self.min_honey = 80
+
+        if self.honey >= self.min_honey:
+            self.seeking_honey = False
+
+    def seekFlowers(self,flowers):
+        for flower in flowers:
+            if distance(flower.pos, self.pos) < distance(self.pos, self.closestflowerpos):
+                self.closestflowerpos = flower.pos
+                # print("CLOSEST FLOWER DETECTED!!")
+    
+    def calculateForces(self):
+        pass # do later
+        
+        
+    
     def draw(self):
         ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, self.col, self.screen_pos, self.size_scaled, int(scaled/8))
+        pygame.draw.circle(screen, self.color, self.screen_pos, self.size_scaled, int(scaled/8))
 
         # drawing creature's ""eyes""
-        for i in self.sensors:
-            angle = np.deg2rad(i[0])
-            distance = i[1]
-            distance_added = pygame.Vector2(distance*np.cos(angle), distance*np.sin(angle))
-
-
-            pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*scaled, width=2)
-
+        # for i in self.sensors:
+        #     angle = np.deg2rad(i[0])
+        #     distance = i[1]
+        #     distance_added = pygame.Vector2(distance*np.cos(angle), distance*np.sin(angle))
+        #
+        #
+        #     pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*scaled, width=2)
 
 
 
@@ -208,6 +247,10 @@ sim.add(test_guy)
 sim.add_hive(test_hive)
 sim.add_flo(test_flower)
 
+def distance(pos1, pos2):
+    posdif = pos2 - pos1
+    return (abs(pygame.Vector2.magnitude(posdif)))
+
 def is_hovered(screen_width, screen_height, screen_pos):
     global mouse
     # this is a terrible (and long line of code). hover code.
@@ -215,7 +258,6 @@ def is_hovered(screen_width, screen_height, screen_pos):
         return True
     else:
         return False
-
 
 def gridpos2screen(x):
     global scaled, camera_offset
@@ -239,7 +281,6 @@ def check_mouse_movement():
     # top_border = self.camera_borders['top'] 
     # right_border = self.display_surface.get_size()[0] - self.camera_borders['right']
     # bottom_border = self.display_surface.get_size()[1] - self.camera_borders['bottom']
-
 
     if mouse.y <= 0:
         mouse_offset.y = -25
@@ -328,7 +369,6 @@ def update_background(size):
             # print(camera_offset)
 
             # print(scaled_x, scaled_y)
-            
 
             # pygame.draw.rect(background_surface, col, (500, 500, 50, 50))
             pygame.draw.rect(background_surface, col, (pos_scaled.x, pos_scaled.y, scaled, scaled))
@@ -373,8 +413,6 @@ def main():
         camera_offset.x = max(0, min(camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
         camera_offset.y = max(0, min(camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
 
-
-
         
         background_surface.fill((50,50,50))
         check_mouse_movement()
@@ -386,7 +424,6 @@ def main():
         # pygame.draw.circle(screen, "black", (30, 30), 500)
 
         sim.run()
-
 
 
         pygame.display.flip()
