@@ -39,7 +39,7 @@ B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
 B_DETECT = 8 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
-B_SEP_THRESHOLD # IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
+B_SEP_THRESHOLD = 1# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
 
 # hive constant
 H_INITIAL_WORKERS = 10
@@ -154,7 +154,7 @@ class Creature():
 
         # self.sensors = [[0, 5], [50, 7]]
 
-        self.velocity = pygame.Vector2((random.random()/5), (random.random()/5))
+        self.velocity = pygame.Vector2(0,0)
 
         self.acceleration = pygame.Vector2(0,0)
 
@@ -171,12 +171,13 @@ class Creature():
         max_speed = 5
 
         self.pos += self.velocity
-
+        
+        # print(self.velocity, self.acceleration)
         self.velocity += self.acceleration
 
-        speed = pygame.math.Vector2.magnitude(self.velocity)
-        if speed > max_speed:
-            self.velocity = (5,5)
+        self.speed = pygame.math.Vector2.magnitude(self.velocity)
+        # if speed > max_speed:
+        #     self.velocity = (5,5)
 
         self.acceleration = pygame.Vector2(0,0)
 
@@ -208,6 +209,7 @@ class Creature():
         self.draw()
 
     def applyForce(self, force):
+        # print(force)
         self.acceleration = force
 
     def whatamidoing(self):
@@ -241,20 +243,20 @@ class Creature():
 
     def separation(self, manager):
         # The separation rule makes the boids avoid bumping into each other. This is done by calculating the distance between the current boid and all the other boids in the group. If the distance is less than a certain threshold, then the boid will move away from the other boid. This is done by calculating the vector from the current boid to the other boid. This vector is then normalized and multiplied by the speed of the boid. This is done in order to make sure that the boids do not move too fast.
-        sepForce = 0
+        sepForce = pygame.Vector2(0,0)
 
         for bee in manager.creatures:
             dist = distance(bee.pos, self.pos)
             if dist <= B_DETECT:
                 diffVec = bee.pos - self.pos
-                if abs(distance(diffVec)) <= B_SEP_THRESHOLD:
+                if abs(distance(diffVec, self.pos)) <= B_SEP_THRESHOLD:
                     nomVec = pygame.Vector2.normalize(diffVec)
 
                     sepForce += nomVec/dist
 
-        sepForce *= self.velocity
+        sepForce *= self.speed
 
-        applyForce(sepForce)
+        self.applyForce(sepForce)
 
 
 
