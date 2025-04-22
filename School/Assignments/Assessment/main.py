@@ -38,6 +38,7 @@ B_COLFULEXP = 0.5 ## exponent to make shit more colourful
 B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff tbh)
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
+B_DETECT = 8 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
 
 # hive constant
 H_INITIAL_WORKERS = 10
@@ -83,6 +84,8 @@ class Simulation():
             creature.seekFlowers(self.flowers)
         for hive in self.hives[:]:
             hive.update(self)
+        for flower in self.flowers[:]:
+            flower.update(self)
 
 class Flower():
     def __init__(self,x,y):
@@ -178,7 +181,7 @@ class Creature():
 
         self.whatamidoing()
 
-        self.calculateForces() # calculates all the forces to do/add
+        self.calculateForces(manager) # calculates all the forces to do/add
 
         # seeking flower code
 
@@ -212,15 +215,38 @@ class Creature():
         if self.honey >= self.min_honey:
             self.seeking_honey = False
 
-    def seekFlowers(self,flowers):
+    def seekFlowers(self, flowers):
+        # 1. find closest flower
+        # 2. if closest flower is arbitrarily ""close"" -> go to it
+        # 3. if closest flower is ""far"" -> oh well! time to ''wander''
+        # this code essentially does step (1)
+
         for flower in flowers:
             if distance(flower.pos, self.pos) < distance(self.pos, self.closestflowerpos):
+                print(distance(flower.pos,self.pos))
                 self.closestflowerpos = flower.pos
                 # print("CLOSEST FLOWER DETECTED!!")
     
-    def calculateForces(self):
-        pass # do later
-        
+    def calculateForces(self, manager):
+        # behaviours of bees:
+        # 1. flocking: boid behaviour with their 3 rules: 1. avoid other bees, 2. same speed as other bees, tend towards the center of a flock
+        # 2. go to flowers
+        # 3. random deviations in movement
+        self.separation(manager)
+
+        self.align(manager)
+
+        self.cohesion(manager)
+
+    def separation(self, manager):
+        for bee in manager.creatures:
+            
+
+    def align(self, manager):
+        pass
+
+    def cohesion(self, manager):
+        pass
         
     
     def draw(self):
@@ -244,7 +270,7 @@ test_guy = Creature(5, 4.5)
 test_hive = Hive(10,10)
 test_flower = Flower(2.5,2.5)
 sim.add(test_guy)
-sim.add_hive(test_hive)
+# sim.add_hive(test_hive)
 sim.add_flo(test_flower)
 
 def distance(pos1, pos2):
