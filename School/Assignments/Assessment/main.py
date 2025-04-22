@@ -284,6 +284,8 @@ class Creature():
         if self.pos.y <= 1:
             self.applyForce(pygame.Vector2(0, 0.1) * abs(self.pos.y - 5))
 
+        # note to self: add bottom left right border  too!
+
     def separation(self, manager):
         # The separation rule makes the boids avoid bumping into each other. This is done by calculating the distance between the current boid and all the other boids in the group. If the distance is less than a certain threshold, then the boid will move away from the other boid. This is done by calculating the vector from the current boid to the other boid. This vector is then normalized and multiplied by the speed of the boid. This is done in order to make sure that the boids do not move too fast.
         sepForce = pygame.Vector2(0,0)
@@ -302,7 +304,7 @@ class Creature():
         self.applyForce(sepForce)
 
 
-
+    # aligns the boid/bee to the average direction of its nearest "flock"
     def align(self, manager):
         avgV = pygame.Vector2(0,0)
         counter = 0
@@ -320,6 +322,7 @@ class Creature():
 
             self.applyForce(alignD)
 
+    # aims the bee towards to center of the ""flock""
     def cohesion(self, manager):
         com = pygame.Vector2(0,0) # center of mass
         counter = 0
@@ -343,7 +346,7 @@ class Creature():
     def draw(self):
         ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, self.color, self.screen_pos, self.size_scaled, int(scaled/8))
+        pygame.draw.circle(screen, self.color, self.screen_pos, (self.size_scaled/2+2)) 
 
         # drawing creature's ""eyes""
         # for i in self.sensors:
