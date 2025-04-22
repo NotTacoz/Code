@@ -40,7 +40,7 @@ B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
 B_DETECT = 8 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
 B_SEP_THRESHOLD = 5# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
-B_MAX_V = 0.5 # max velocity
+B_MAX_V = 0.1 # max velocity
 
 # hive constant
 H_INITIAL_WORKERS = 10
@@ -172,6 +172,10 @@ class Creature():
         global scaled
 
         # print("my current pos is: ", self.pos)
+        
+        fac = 20
+
+        self.velocity += pygame.Vector2((random.random()-0.5)/fac,(random.random()-0.5)/fac)
 
         # m so sad theres no func for this and i dont want to make one
         if self.velocity.x >= B_MAX_V:
@@ -197,6 +201,7 @@ class Creature():
         #     self.velocity.y = max_speed
 
         self.acceleration = pygame.Vector2(0,0) # reset acceleration
+
 
         self.whatamidoing()
 
@@ -252,7 +257,8 @@ class Creature():
     
     def goFlower(self):
         # get vector from closest flower and itself
-        if distance(self.pos, self.closestflowerpos) <= B_DETECT: 
+        # im not sure why but the current implementation the bees are circling the flowers
+        if distance(self.pos, self.closestflowerpos) <= B_DETECT/1: 
             diffVec = + self.closestflowerpos - self.pos
             # normalise it, multiply by speed
             outputVec = pygame.math.Vector2(diffVec) * self.speed
