@@ -41,7 +41,7 @@ B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
 B_DETECT = 8 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
 B_SEP_THRESHOLD = 5# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
-B_MAX_V = 0.1 # max velocity
+B_MAX_V = 0.5 # max velocity
 
 # hive constant
 H_INITIAL_WORKERS = 10
@@ -65,7 +65,7 @@ def distance(pos1, pos2):
     return (abs(pygame.Vector2.magnitude(posdif)))
 
 def is_hovered(screen_width, screen_height, screen_pos):
-    global mouse
+    mouse = pygame.math.Vector2(pygame.mouse.get_pos())
     # this is a terrible (and long line of code). hover code.
     if (-screen_width < mouse.x - screen_pos.x <  screen_width) and (-screen_height < mouse.y - screen_pos.y < screen_height):
         return True
@@ -83,7 +83,6 @@ def screenpos2grid(x):
 
 def check_mouse_movement():
     global camera_offset
-    global mouse
     
     mouse = pygame.math.Vector2(pygame.mouse.get_pos())
 
@@ -198,7 +197,8 @@ class Simulation():
         self.creatures = []
         self.hives = []
         self.flowers = []
-
+        self.selected_bee = None
+        
     def add(self,creature):
         self.creatures.append(creature)
 
@@ -224,6 +224,38 @@ class Simulation():
             flower.update(self)
         for creature in self.creatures[:]:
             creature.update(self)
+        self.show_selected()
+    
+    def handle_click(self, click_pos_screen):
+        clicked = False
+
+        click_vec = pygame.Vector2(click_pos_screen)
+
+        if not clicked:
+            for bee in reversed(self.creatures): # this is reversed so the last drawn (top most bee) is checked first in case a bee is on top of another bees
+                screen_pos = gridpos2screen(bee.pos)
+                diff = pygame.math.Vector2.magnitude(screen_pos - click_vec)
+                if diff <= bee.radius:
+                    clicked = True
+                    print("omg clicked on bee")
+                    self.selected_bee = bee
+
+        if clicked == False: # clicked on empty space
+            self.selected_bee = None
+
+    def show_selected(self):
+        # Check if there is a selected bee
+        if not self.selected_bee:
+            return
+
+        gui_pos = pygame.Vector2(10,10) 
+        gui_width = 200
+        gui_height = 200
+        
+        panel_surface = pygame.Surface((gui_width, gui_height), pygame.SRCALPHA) #src alpha is used for transparency
+        panel_surface.fill((0,0,0,150)) # semi transparent
+        screen.blit(panel_surface, (gui_pos))
+
 
 class Flower():
     def __init__(self,x,y):
@@ -323,7 +355,7 @@ class Creature():
         elif self.velocity.y <= -B_MAX_V:
             self.velocity.y = -B_MAX_V
 
-        # print(self.velocity)
+        # print(self.velocity
 
         self.pos += self.velocity
         
@@ -358,12 +390,12 @@ class Creature():
 
         self.size_raw = self.energy/500
 
-        self.size_scaled = self.size_raw * scaled*2
+        self.size_scaled = self.size_raw * scaled
+
+        self.radius = (self.size_scaled+2)
 
         self.screen_pos = gridpos2screen(self.pos)
         # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
-        if (is_hovered(self.size_scaled, self.size_scaled, self.screen_pos)) and pygame.mouse.get_pressed()[0]:
-            self.show_stats()
 
         self.draw()
 
@@ -482,14 +514,10 @@ class Creature():
             # print("applying force of, ", dir)
             self.applyForce(dir)
         
-    def show_stats(self):
-        self.color = (0,255,0)
-        print(self)
-
     def draw(self):
         ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, self.color, self.screen_pos, (self.size_scaled/2+2)) 
+        pygame.draw.circle(screen, self.color, self.screen_pos, (self.size_scaled+2)) 
 
         # drawing creature's ""eyes""
         # for i in self.sensors:
@@ -535,6 +563,9 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running=False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    sim.handle_click(event.pos)
             if event.type == pygame.KEYDOWN:
                 global WORLD_SIZE
                 if event.key == pygame.K_EQUALS:
