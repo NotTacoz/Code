@@ -81,12 +81,12 @@ class Simulation():
         self.flowers.remove(flower)
 
     def run(self):
-        for creature in self.creatures[:]:
-            creature.update(self)
         for hive in self.hives[:]:
             hive.update(self)
         for flower in self.flowers[:]:
             flower.update(self)
+        for creature in self.creatures[:]:
+            creature.update(self)
 
 class Flower():
     def __init__(self,x,y):
@@ -118,7 +118,7 @@ class Flower():
         #
         #     pygame.draw.ellipse(screen, self.petalCol, (draw_pos.x, draw_pos.y, 0.5*scaled, 1.2*scaled))
         #
-        pygame.draw.circle(screen, self.petalCol, (screen_pos), scaled/3)
+        pygame.draw.circle(screen, self.petalCol, (screen_pos), scaled)
 
 
 class Hive():
@@ -260,8 +260,8 @@ class Creature():
         # im not sure why but the current implementation the bees are circling the flowers
         if distance(self.pos, self.closestflowerpos) <= B_DETECT/1: 
             diffVec = + self.closestflowerpos - self.pos
-            # normalise it, multiply by speed
-            outputVec = pygame.math.Vector2(diffVec) * self.speed
+            # normalise it, multiply by speed, and multplied by distance from flower
+            outputVec = pygame.math.Vector2(diffVec) * self.speed * distance(self.closestflowerpos, self.pos)
 
             self.applyForce(outputVec)
 
@@ -281,10 +281,14 @@ class Creature():
     def avoidedge(self, manager):
         if self.pos.x <= 1:
             self.applyForce(pygame.Vector2(0.1, 0) * abs(self.pos.x -  5))
+        elif self.pos.x >= MAP_SIZE - 1:
+            self.applyForce(pygame.Vector2(-0.1, 0) * abs(self.pos.x -  5))
         if self.pos.y <= 1:
             self.applyForce(pygame.Vector2(0, 0.1) * abs(self.pos.y - 5))
+        elif self.pos.y >= MAP_SIZE - 1:
+            self.applyForce(pygame.Vector2(0, -0.1) * abs(self.pos.y -  5))
 
-        # note to self: add bottom left right border  too!
+        # note to self: add bottom left right border  too! future note: done!
 
     def separation(self, manager):
         # The separation rule makes the boids avoid bumping into each other. This is done by calculating the distance between the current boid and all the other boids in the group. If the distance is less than a certain threshold, then the boid will move away from the other boid. This is done by calculating the vector from the current boid to the other boid. This vector is then normalized and multiplied by the speed of the boid. This is done in order to make sure that the boids do not move too fast.
@@ -367,8 +371,11 @@ test_flower = Flower(2.5,2.5)
 sim.add(test_guy)
 sim.add(test_guy2)
 
+for i in range(200):
+    sim.add(Creature(random.randint(0,100), random.randint(0,100)))
+
 for i in range(10):
-    sim.add(Creature(5+i, 5+i))
+    sim.add_flo(Flower(random.randint(0,100), random.randint(0,100)))
 
 # sim.add_hive(test_hive)
 sim.add_flo(test_flower)
