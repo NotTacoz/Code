@@ -17,11 +17,9 @@ WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
 INITIAL_WORLD_SIZE = 4096
 MAP_SIZE = 128
 
-# Colors
+# colours
 BACKGROUND_FILL = (50,50,50)
-CR_HOVER_COLOR = (0, 255, 0)
-SENSOR_COLOR = (255, 0, 0)
-
+CR_HOVER_COLOUR = (0, 255, 0)
 # Camera
 CA_SCROLL_SPEED = 30
 CA_BORDER_MARGIN = 5
@@ -41,7 +39,7 @@ B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
 B_DETECT = 8 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
 B_SEP_THRESHOLD = 5# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
-B_MAX_V = 0.5 # max velocity
+B_MAX_V = 0.05 # max velocity
 
 # hive constant
 H_INITIAL_WORKERS = 10
@@ -52,8 +50,13 @@ scaled = INITIAL_WORLD_SIZE/MAP_SIZE
 # FLOWERS
 F_SIZE = 8 # unscaled
 
+# fonts
+TEXT_COLOUR = (255 ,255, 255)
+
 ## INITIALISATION !!!
 pygame.init()
+pygame.font.init()
+STATS_FONT = pygame.font.SysFont("Arial", 16)
 # np.set_printoptions(threshold=sys.maxsize) # Make print np arrays more comprehensive
 
 # 
@@ -80,6 +83,12 @@ def gridpos2screen(x):
 def screenpos2grid(x):
     global scaled, camera_offset
     return ((x+camera_offset)/scaled)
+
+def draw_text(surface, text, font, colour, position, anchor="topleft"):
+    text_surface = font.render(text, True, colour)
+    text_rect = text_surface.get_rect()
+    setattr(text_rect, anchor, position)
+    surface.blit(text_surface, text_rect)
 
 def check_mouse_movement():
     global camera_offset
@@ -255,6 +264,30 @@ class Simulation():
         panel_surface = pygame.Surface((gui_width, gui_height), pygame.SRCALPHA) #src alpha is used for transparency
         panel_surface.fill((0,0,0,150)) # semi transparent
         screen.blit(panel_surface, (gui_pos))
+        bee = self.selected_bee
+
+        stats = {
+            "Position": bee.pos,
+            "Velocity": bee.velocity,
+            "Energy": bee.energy,
+            "Honey": bee.honey,
+            "Seeking Honey?": bee.seeking_honey,
+            "Closest Flower": bee.closestflowerpos,
+            "Colour": bee.colour,
+        }
+        
+        offset = 20
+        for key, value in stats.items():
+            if isinstance(value, pygame.Vector2):
+                display_value = f"({value.x:.2f}, {value.y:.2f})"
+            elif isinstance(value, float):
+                display_value = f"{value:.2f}"
+            else:
+                display_value = str(value)
+            text = f"{key}: {display_value}"
+
+            draw_text(screen, text, STATS_FONT, TEXT_COLOUR, (gui_pos.x, offset))
+            offset+= 20
 
 
 class Flower():
@@ -330,7 +363,7 @@ class Creature():
 
         # self.velocity = pygame.Vector2(0,0)
 
-        self.color = (random.randint(170,255), random.randint(170,255), random.randint(0,50))
+        self.colour = (random.randint(170,255), random.randint(170,255), random.randint(0,50))
 
         self.seeking_honey = True
 
@@ -362,6 +395,8 @@ class Creature():
         # print(self.velocity, self.acceleration)
         self.velocity += self.acceleration
 
+        self.selected = False
+
         self.speed = pygame.math.Vector2.magnitude(self.velocity)
 
         # if self.speed > max_speed:
@@ -370,10 +405,14 @@ class Creature():
 
         self.acceleration = pygame.Vector2(0,0) # reset acceleration
 
-
         self.whatamidoing()
 
         self.calculateForces(manager) # calculates all the forces to do/add
+
+        if manager.selected_bee == self:
+            self.selected = True
+        else:
+            self.selected = False
 
         # seeking flower code
         self.seekFlowers(manager.flowers)
@@ -517,7 +556,9 @@ class Creature():
     def draw(self):
         ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, self.color, self.screen_pos, (self.size_scaled+2)) 
+        pygame.draw.circle(screen, self.colour, self.screen_pos, (self.size_scaled+2)) 
+        if self.selected == True:
+            pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, (self.size_scaled+3), 2) 
 
         # drawing creature's ""eyes""
         # for i in self.sensors:
