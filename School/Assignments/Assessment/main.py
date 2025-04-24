@@ -38,11 +38,11 @@ B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
 B_DETECT = 8 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
-B_SEP_THRESHOLD = 5# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
-B_MAX_V = 0.05 # max velocity
+B_SEP_THRESHOLD = 2# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
+B_MAX_V = 0.09 # max velocity
 
 # hive constant
-H_INITIAL_WORKERS = 10
+H_INITIAL_WORKERS = 100
 H_INITIAL_QUEENS = 1
 
 scaled = INITIAL_WORLD_SIZE/MAP_SIZE
@@ -272,8 +272,9 @@ class Simulation():
             "Energy": bee.energy,
             "Honey": bee.honey,
             "Seeking Honey?": bee.seeking_honey,
-            "Closest Flower": bee.closestflowerpos,
+            "Closest Flower Position": bee.closestflowerpos,
             "Colour": bee.colour,
+            "Honey": bee.honey,
         }
         
         offset = 20
@@ -324,11 +325,18 @@ class Flower():
 
 
 class Hive():
-    def __init__(self,x,y):
+    def __init__(self,x,y, sim):
         self.pos=pygame.Vector2(x,y)
 
         self.workerspop = H_INITIAL_WORKERS
         self.queenpop = H_INITIAL_QUEENS
+
+        self.size = self.workerspop + self.queenpop
+        print(self.size)
+
+        for i in range(self.workerspop):
+            offset_pos = [((random.random()-0.5)*20), ((random.random()-0.5)*20)]
+            sim.add(Creature(x+offset_pos[0]+self.size/8, y+offset_pos[1]+self.size/8))
 
     def update(self, manager):
         self.size = self.workerspop + self.queenpop
@@ -342,7 +350,7 @@ class Hive():
 
         screen_pos = gridpos2screen(self.pos)
 
-        pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x, screen_pos.y, self.size * scaled, self.size * scaled))
+        # pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x, screen_pos.y, self.size * scaled/4, self.size * scaled/4))
 
 class Creature():
     def __init__(self, x, y):
@@ -361,6 +369,7 @@ class Creature():
         # self.acceleration = pygame.Vector2((random.random()-0.5)/100,(random.random()-0.5)/100)
         self.velocity = pygame.Vector2((random.random()-0.5)/1,(random.random()-0.5)/1)
 
+        self.speed = pygame.math.Vector2.magnitude(self.velocity)
         # self.velocity = pygame.Vector2(0,0)
 
         self.colour = (random.randint(170,255), random.randint(170,255), random.randint(0,50))
@@ -374,37 +383,8 @@ class Creature():
         global scaled
 
         # print("my current pos is: ", self.pos)
-        
-        fac = 20
-
-        self.velocity += pygame.Vector2((random.random()-0.5)/fac,(random.random()-0.5)/fac)
-
-        if self.velocity.x >= B_MAX_V:
-            self.velocity.x = B_MAX_V
-        elif self.velocity.x <= -B_MAX_V:
-            self.velocity.x = -B_MAX_V
-        if self.velocity.y >= B_MAX_V:
-            self.velocity.y = B_MAX_V
-        elif self.velocity.y <= -B_MAX_V:
-            self.velocity.y = -B_MAX_V
-
-        # print(self.velocity
-
-        self.pos += self.velocity
-        
-        # print(self.velocity, self.acceleration)
-        self.velocity += self.acceleration
-
-        self.selected = False
-
-        self.speed = pygame.math.Vector2.magnitude(self.velocity)
-
-        # if self.speed > max_speed:
-        #     self.velocity.x = max_speed
-        #     self.velocity.y = max_speed
-
         self.acceleration = pygame.Vector2(0,0) # reset acceleration
-
+        
         self.whatamidoing()
 
         self.calculateForces(manager) # calculates all the forces to do/add
@@ -416,6 +396,34 @@ class Creature():
 
         # seeking flower code
         self.seekFlowers(manager.flowers)
+        # fac = 20
+        #
+        # self.velocity += pygame.Vector2((random.random()-0.5)/fac,(random.random()-0.5)/fac)
+
+        self.speed = pygame.math.Vector2.magnitude(self.velocity)
+        if self.velocity.x >= B_MAX_V:
+            self.velocity.x = B_MAX_V
+        elif self.velocity.x <= -B_MAX_V:
+            self.velocity.x = -B_MAX_V
+        if self.velocity.y >= B_MAX_V:
+            self.velocity.y = B_MAX_V
+        elif self.velocity.y <= -B_MAX_V:
+            self.velocity.y = -B_MAX_V
+        # print(self.velocity
+
+        self.pos += self.velocity
+        
+        # print(self.velocity, self.acceleration)
+        self.velocity += self.acceleration
+
+        self.selected = False
+
+
+        self.speed = pygame.math.Vector2.magnitude(self.velocity)
+
+        # if self.speed > max_speed:
+        #     self.velocity.x = max_speed
+        #     self.velocity.y = max_speed
 
         ## idk anymore
 
@@ -440,7 +448,7 @@ class Creature():
 
     def applyForce(self, force):
         # print(force)
-        self.acceleration = force / 10
+        self.acceleration += force / 50
 
     def whatamidoing(self):
         self.min_honey = 80
@@ -461,11 +469,13 @@ class Creature():
                 # print("CLOSEST FLOWER DETECTED!!", flower.pos)
         if self.seeking_honey == True:
             self.goFlower()
+            if distance(self.pos, self.closestflowerpos) <= B_DETECT/4:
+                self.honey += 0.2
     
     def goFlower(self):
         # get vector from closest flower and itself
         # im not sure why but the current implementation the bees are circling the flowers
-        if distance(self.pos, self.closestflowerpos) <= B_DETECT/1: 
+        if distance(self.pos, self.closestflowerpos) <= B_DETECT/0.5: 
             diffVec = + self.closestflowerpos - self.pos
             # normalise it, multiply by speed, and multplied by distance from flower
             outputVec = pygame.math.Vector2(diffVec) * self.speed * distance(self.closestflowerpos, self.pos)
@@ -505,14 +515,14 @@ class Creature():
             dist = distance(bee.pos, self.pos)
             if dist <= B_DETECT and bee.pos != self.pos:
                 diffVec = bee.pos - self.pos
-                if abs(distance(diffVec, self.pos)) <= B_SEP_THRESHOLD:
+                # print(abs(distance(diffVec, self.pos)))
+                if abs(dist) <= B_SEP_THRESHOLD:
                     nomVec = pygame.Vector2.normalize(diffVec)
+                    # print("Sep")
 
-                    sepForce += nomVec/dist
+                    sepForce += nomVec/dist * self.speed
 
-        sepForce *= self.speed
-
-        self.applyForce(sepForce)
+        self.applyForce(-sepForce)        
 
 
     # aligns the boid/bee to the average direction of its nearest "flock"
@@ -573,10 +583,8 @@ class Creature():
 
 sim = Simulation()
 
-sim.add_hive(Hive(10,10))
+sim.add_hive(Hive(10,10, sim))
 
-for i in range(100):
-    sim.add(Creature(random.randint(0,128), random.randint(0,128)))
 
 for i in range(10):
     sim.add_flo(Flower(random.randint(10,118), random.randint(10,118)))
