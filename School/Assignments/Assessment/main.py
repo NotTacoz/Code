@@ -37,13 +37,14 @@ B_COLFULEXP = 0.5 ## exponent to make shit more colourful
 B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff tbh)
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
-B_DETECT = 5 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
-B_SEP_THRESHOLD = 1.5# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
+B_DETECT = 6 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
+B_SEP_THRESHOLD = 1# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
 B_MAX_V = 0.12 # max velocity
 
 # hive constant
 H_INITIAL_WORKERS = 100
 H_INITIAL_QUEENS = 1
+H_BEE_COOLDOWN = 30 # number of frames before a bee can exit/enter
 
 scaled = INITIAL_WORLD_SIZE/MAP_SIZE
 
@@ -329,18 +330,38 @@ class Hive():
         self.pos=pygame.Vector2(x,y)
 
         self.workerspop = H_INITIAL_WORKERS
+        self.numbeesinside = self.workerspop
         self.queenpop = H_INITIAL_QUEENS
+        self.bees_inside = []
+        self.bees_outside = []
+
+        self.internal_cooldown = 0
+
+        self.beelook = 0
 
         self.size = self.workerspop + self.queenpop
         print(self.size)
 
         for i in range(self.workerspop):
-            offset_pos = [((random.random()-0.5)*20), ((random.random()-0.5)*20)]
-            sim.add(Creature(x+offset_pos[0]+self.size/8, y+offset_pos[1]+self.size/8))
+            offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
+            self.bees_inside.append(Creature(x, y))
 
     def update(self, manager):
-        self.size = self.workerspop + self.queenpop
-        
+        # self.size = self.workerspop + self.queenpop
+        if self.internal_cooldown == 0 and len(self.bees_inside) > 0:
+            # bee to look at variable
+
+            # for every bee in inside
+            bee = self.bees_inside[self.beelook]
+            if bee.seeking_honey == True:
+                sim.add(bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
+                self.bees_inside.pop(self.beelook) # always pops the 0th bee 
+                self.bees_outside.append(bee)
+            else:
+                self.beelook += 1
+            self.internal_cooldown = H_BEE_COOLDOWN
+        elif self.internal_cooldown > 0 :
+            self.internal_cooldown -= 1
 
         self.draw()
 
@@ -350,7 +371,7 @@ class Hive():
 
         screen_pos = gridpos2screen(self.pos)
 
-        pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x, screen_pos.y, scaled/2, scaled/2))
+        pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x, screen_pos.y, scaled*4, scaled*4))
 
 class Creature():
     def __init__(self, x, y):
@@ -367,7 +388,7 @@ class Creature():
         self.acceleration = pygame.Vector2(0,0)
 
         # self.acceleration = pygame.Vector2((random.random()-0.5)/100,(random.random()-0.5)/100)
-        self.velocity = pygame.Vector2((random.random()-0.5)/1,(random.random()-0.5)/1)
+        self.velocity = pygame.math.Vector2.rotate(pygame.Vector2(0.9, 0.9), random.randint(-360, 360))
 
         self.speed = pygame.math.Vector2.magnitude(self.velocity)
         # self.velocity = pygame.Vector2(0,0)
@@ -395,9 +416,12 @@ class Creature():
 
         self.velocity += self.acceleration
 
-        fac = 30
-        self.velocity += pygame.Vector2((random.random()-0.5)/fac,(random.random()-0.5)/fac)
 
+        
+        fac = 30 # angle factor
+        rotate = (random.random() - 0.5)*fac
+        self.velocity = pygame.math.Vector2.rotate(self.velocity, rotate)
+        
         self.speed = pygame.math.Vector2.magnitude(self.velocity)
         if self.velocity.x >= B_MAX_V:
             self.velocity.x = B_MAX_V
@@ -410,9 +434,9 @@ class Creature():
         # print(self.velocity
 
         # map velocity + dampen
-        mapvalue = (1-(maparr[round(self.pos.x), round(self.pos.y)]))**(1/5)
-        if mapvalue >= 0.865: mapvalue = 0.99
-        self.velocity *= mapvalue**(1/5) # dampens
+        # mapvalue = (1-(maparr[round(self.pos.x), round(self.pos.y)]))**(1/5)
+        # if mapvalue >= 0.865: mapvalue = 0.99
+        # self.velocity *= mapvalue**(1/5) # dampens
 
         self.pos += self.velocity
         
@@ -468,14 +492,14 @@ class Creature():
                 self.closestflowerpos = flower.pos
                 # print("CLOSEST FLOWER DETECTED!!", flower.pos)
         if self.seeking_honey == True:
-            self.goFlower()
+            # self.goFlower()
             if distance(self.pos, self.closestflowerpos) <= B_DETECT/4:
                 self.honey += 0.2
     
     def goFlower(self):
         # get vector from closest flower and itself
         # im not sure why but the current implementation the bees are circling the flowers
-        if distance(self.pos, self.closestflowerpos) <= B_DETECT/0.5: 
+        if distance(self.pos, self.closestflowerpos) <= B_DETECT: 
             diffVec = + self.closestflowerpos - self.pos
             # normalise it, multiply by speed, and multplied by distance from flower
             outputVec = pygame.math.Vector2(diffVec) * self.speed * distance(self.closestflowerpos, self.pos)
@@ -558,7 +582,7 @@ class Creature():
 
             diff = com - self.pos
 
-            dir = pygame.Vector2.normalize(diff) * self.speed * 3
+            dir = pygame.Vector2.normalize(diff) * self.speed
 
             # print("applying force of, ", dir)
             return(dir)
