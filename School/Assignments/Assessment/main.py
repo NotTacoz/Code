@@ -77,13 +77,21 @@ def is_hovered(screen_width, screen_height, screen_pos):
         return False
 
 def gridpos2screen(x):
-    global scaled, camera_offset
     # print(MAP_SIZE) # should be 128x128 by default
     return (x * scaled - camera_offset)
     
 def screenpos2grid(x):
-    global scaled, camera_offset
     return ((x+camera_offset)/scaled)
+
+def hivepos2screen(x):
+    # this is kinda stupid but i made hive 400x400 and not changeable but because im too lazy. maybe ill change it later
+    # but at this point of time 27th april its not a big deal.
+    # assuming 1280x720 display, hive is shown to be the last 400 pixels with a 10 pixecl offset
+    # im going to make the hive 40x40 for arbitrary sake so each pos is 10
+    return (pygame.Vector2(WINDOW_WIDTH-410, WINDOW_HEIGHT-410)+x*10)
+
+def screenpos2hive(x):
+    return ((x - pygame.Vector2(WINDOW_WIDTH-410, WINDOW_HEIGHT-410))/10)
 
 def draw_text(surface, text, font, colour, position, anchor="topleft"):
     text_surface = font.render(text, True, colour)
@@ -231,10 +239,12 @@ class Simulation():
     def run(self):
         for hive in self.hives[:]:
             hive.update(self)
+            for bee in hive.bees_outside:
+                bee.update(self)
         for flower in self.flowers[:]:
             flower.update(self)
-        for creature in self.creatures[:]:
-            creature.update(self)
+        # for creature in self.creatures[:]:
+        #     creature.update(self)
         self.show_selected()
     
     def handle_click(self, click_pos_screen):
@@ -270,8 +280,8 @@ class Simulation():
             return
 
         gui_pos = pygame.Vector2(10,10) 
-        gui_width = 200
-        gui_height = 200
+        gui_width = 300
+        gui_height = 170
         
         
         if (self.selected_bee):
@@ -305,9 +315,17 @@ class Simulation():
                 draw_text(screen, text, STATS_FONT, TEXT_COLOUR, (gui_pos.x, offset))
                 offset+= 20
         elif (self.selected_hive):
-            panel_surface = pygame.Surface((gui_width, gui_height))#src alpha is used for transparency
-            panel_surface.fill((50,25,0,150)) # semi transparent
+            gui_width = 400
+            gui_height = 400
+            panel_surface = pygame.Surface((gui_width, gui_height), pygame.SRCALPHA)#src alpha is used for transparency
+            panel_surface.fill((50,25,0,255)) # semi transparent
             screen.blit(panel_surface, ((WINDOW_WIDTH-gui_width - 10, WINDOW_HEIGHT-gui_height - 10)))
+            
+            bees_inside = self.selected_hive.bees_inside
+
+            for bee in bees_inside:
+                bee.draw_inside_hive()
+
 
 
 class Flower():
@@ -362,7 +380,10 @@ class Hive():
 
         for i in range(self.workerspop):
             offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
-            self.bees_inside.append(Creature(x, y))
+            temp_bee = Creature(x,y)
+
+            sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
+            self.bees_inside.append(temp_bee)
 
     def update(self, manager):
         # self.size = self.workerspop + self.queenpop
@@ -374,7 +395,6 @@ class Hive():
             # for every bee in inside
             bee = self.bees_inside[self.beelook]
             if bee.seeking_honey == True:
-                sim.add(bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
                 self.bees_inside.pop(self.beelook) # always pops the 0th bee 
                 self.bees_outside.append(bee)
             else:
@@ -420,6 +440,12 @@ class Creature():
 
         self.closestflowerpos = pygame.Vector2(999, 999)
 
+        self.size_raw = self.energy/500
+
+        self.size_scaled = self.size_raw * scaled
+
+        self.radius = (self.size_scaled+2)
+
     def update(self, manager):
         global mouse
         global scaled
@@ -437,21 +463,17 @@ class Creature():
 
         self.velocity += self.acceleration
 
-
         
         fac = 30 # angle factor
         rotate = (random.random() - 0.5)*fac
         self.velocity = pygame.math.Vector2.rotate(self.velocity, rotate)
         
         self.speed = pygame.math.Vector2.magnitude(self.velocity)
-        if self.velocity.x >= B_MAX_V:
-            self.velocity.x = B_MAX_V
-        elif self.velocity.x <= -B_MAX_V:
-            self.velocity.x = -B_MAX_V
-        if self.velocity.y >= B_MAX_V:
-            self.velocity.y = B_MAX_V
-        elif self.velocity.y <= -B_MAX_V:
-            self.velocity.y = -B_MAX_V
+
+        if self.speed >= B_MAX_V:
+            self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MAX_V
+            self.speed = pygame.math.Vector2.magnitude(self.velocity)
+
         # print(self.velocity
 
         # map velocity + dampen
@@ -624,6 +646,16 @@ class Creature():
         #
         #
         #     pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*scaled, width=2)
+
+    def draw_inside_hive(self):
+        # code on writing bee behaviour INSIDE the hive. i can tbe bothered so everything might be in this ONE function
+        # self.hive_pos = (pygame.Vector2(random.randint(880, 1270), 650)) # temp screen pos inside hive
+        # print(self.pos)
+        self.hive_pos = hivepos2screen(pygame.Vector2(random.randint(0,40), random.randint(0,40))) # to see if the function works. (it does!)
+        # print(self.hive_pos)
+        
+        pygame.draw.circle(screen, self.colour, self.hive_pos, (self.size_scaled+2)) 
+        # print("wow you are drawing me") # LOL
 
 
 
