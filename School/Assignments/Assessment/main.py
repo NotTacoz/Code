@@ -208,6 +208,7 @@ class Simulation():
         self.hives = []
         self.flowers = []
         self.selected_bee = None
+        self.selected_hive = None
         
     def add(self,creature):
         self.creatures.append(creature)
@@ -237,59 +238,76 @@ class Simulation():
         self.show_selected()
     
     def handle_click(self, click_pos_screen):
-        clicked = False
+        clicked = False # by default it is not clicked
 
         click_vec = pygame.Vector2(click_pos_screen)
+
+        self.selected_bee = None
+        self.selected_hive = None
 
         if not clicked:
             for bee in reversed(self.creatures): # this is reversed so the last drawn (top most bee) is checked first in case a bee is on top of another bees
                 screen_pos = gridpos2screen(bee.pos)
                 diff = pygame.math.Vector2.magnitude(screen_pos - click_vec)
                 if diff <= bee.radius:
-                    clicked = True
                     print("omg clicked on bee")
                     self.selected_bee = bee
+                    clicked = True # breaks out of the for loop
 
-        if clicked == False: # clicked on empty space
-            self.selected_bee = None
+        if not clicked: # if they clicked on hive
+            for hive in reversed(self.hives):
+                screen_pos = gridpos2screen(hive.pos)
+                diff = pygame.math.Vector2.magnitude(screen_pos-click_vec) # gets the distance from cursor and hive
+                if diff <= hive.size/2:
+                    self.selected_hive = hive
+                    clicked = True
+                    print("yo you clicked on le hive")
+
 
     def show_selected(self):
         # Check if there is a selected bee
-        if not self.selected_bee:
+        if (not self.selected_bee) and (not self.selected_hive):
             return
 
         gui_pos = pygame.Vector2(10,10) 
         gui_width = 200
         gui_height = 200
         
-        panel_surface = pygame.Surface((gui_width, gui_height), pygame.SRCALPHA) #src alpha is used for transparency
-        panel_surface.fill((0,0,0,150)) # semi transparent
-        screen.blit(panel_surface, (gui_pos))
-        bee = self.selected_bee
-
-        stats = {
-            "Position": bee.pos,
-            "Velocity": bee.velocity,
-            "Energy": bee.energy,
-            "Honey": bee.honey,
-            "Seeking Honey?": bee.seeking_honey,
-            "Closest Flower Position": bee.closestflowerpos,
-            "Colour": bee.colour,
-            "Honey": bee.honey,
-        }
         
-        offset = 20
-        for key, value in stats.items():
-            if isinstance(value, pygame.Vector2):
-                display_value = f"({value.x:.2f}, {value.y:.2f})"
-            elif isinstance(value, float):
-                display_value = f"{value:.2f}"
-            else:
-                display_value = str(value)
-            text = f"{key}: {display_value}"
+        if (self.selected_bee):
+            panel_surface = pygame.Surface((gui_width, gui_height), pygame.SRCALPHA) #src alpha is used for transparency
+            panel_surface.fill((0,0,0,150)) # semi transparent
+            screen.blit(panel_surface, (gui_pos))
 
-            draw_text(screen, text, STATS_FONT, TEXT_COLOUR, (gui_pos.x, offset))
-            offset+= 20
+            bee = self.selected_bee
+
+            stats = {
+                "Position": bee.pos,
+                "Velocity": bee.velocity,
+                "Energy": bee.energy,
+                "Honey": bee.honey,
+                "Seeking Honey?": bee.seeking_honey,
+                "Closest Flower Position": bee.closestflowerpos,
+                "Colour": bee.colour,
+                "Honey": bee.honey,
+            }
+            
+            offset = 20
+            for key, value in stats.items():
+                if isinstance(value, pygame.Vector2):
+                    display_value = f"({value.x:.2f}, {value.y:.2f})"
+                elif isinstance(value, float):
+                    display_value = f"{value:.2f}"
+                else:
+                    display_value = str(value)
+                text = f"{key}: {display_value}"
+
+                draw_text(screen, text, STATS_FONT, TEXT_COLOUR, (gui_pos.x, offset))
+                offset+= 20
+        elif (self.selected_hive):
+            panel_surface = pygame.Surface((gui_width, gui_height))#src alpha is used for transparency
+            panel_surface.fill((50,25,0,150)) # semi transparent
+            screen.blit(panel_surface, ((WINDOW_WIDTH-gui_width - 10, WINDOW_HEIGHT-gui_height - 10)))
 
 
 class Flower():
@@ -348,6 +366,8 @@ class Hive():
 
     def update(self, manager):
         # self.size = self.workerspop + self.queenpop
+        # checks if it is selected
+        self.size = scaled*4
         if self.internal_cooldown == 0 and len(self.bees_inside) > 0:
             # bee to look at variable
 
@@ -371,7 +391,8 @@ class Hive():
 
         screen_pos = gridpos2screen(self.pos)
 
-        pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x, screen_pos.y, scaled*4, scaled*4))
+        # draws the hive where its center is its coordinate self.pos (x,y)
+        pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x-self.size/2, screen_pos.y-self.size/2, self.size, self.size))
 
 class Creature():
     def __init__(self, x, y):
