@@ -37,14 +37,15 @@ B_COLFULEXP = 0.5 ## exponent to make shit more colourful
 B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff tbh)
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
-B_DETECT = 6 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
-B_SEP_THRESHOLD = 1# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
-B_MAX_V = 0.12 # max velocity
+B_DETECT = 2 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
+B_SEP_THRESHOLD = 0.5# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
+B_MAX_V = 0.1 # max velocit
+B_MIN_V = 0.02
 
 # hive constant
 H_INITIAL_WORKERS = 100
 H_INITIAL_QUEENS = 1
-H_BEE_COOLDOWN = 30 # number of frames before a bee can exit/enter
+H_BEE_COOLDOWN = 3 # number of frames before a bee can exit/enter
 
 scaled = INITIAL_WORLD_SIZE/MAP_SIZE
 
@@ -380,7 +381,7 @@ class Hive():
 
         for i in range(self.workerspop):
             offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
-            temp_bee = Creature(x,y)
+            temp_bee = Creature(x,y, self)
 
             sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
             self.bees_inside.append(temp_bee)
@@ -400,6 +401,8 @@ class Hive():
             else:
                 self.beelook += 1
             self.internal_cooldown = H_BEE_COOLDOWN
+        elif len(self.bees_inside) == 0:
+            self.beelook = 0
         elif self.internal_cooldown > 0 :
             self.internal_cooldown -= 1
 
@@ -415,7 +418,7 @@ class Hive():
         pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x-self.size/2, screen_pos.y-self.size/2, self.size, self.size))
 
 class Creature():
-    def __init__(self, x, y):
+    def __init__(self, x, y, hive):
         self.pos = pygame.Vector2(x, y) #change pos later 
         
         self.energy = CR_INITIAL_ENERGY
@@ -423,6 +426,10 @@ class Creature():
         self.honey = 0
 
         self.angle = 0
+
+        self.hive = hive
+
+        self.hive_pos = hivepos2screen(pygame.Vector2(random.randint(0,40), random.randint(0,40))) # to see if the function works. (it does!)
 
         # self.sensors = [[0, 5], [50, 7]]
 
@@ -472,7 +479,9 @@ class Creature():
 
         if self.speed >= B_MAX_V:
             self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MAX_V
-            self.speed = pygame.math.Vector2.magnitude(self.velocity)
+        if self.speed <= B_MIN_V:
+            self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MIN_V
+        self.speed = pygame.math.Vector2.magnitude(self.velocity)
 
         # print(self.velocity
 
@@ -535,19 +544,39 @@ class Creature():
                 self.closestflowerpos = flower.pos
                 # print("CLOSEST FLOWER DETECTED!!", flower.pos)
         if self.seeking_honey == True:
-            # self.goFlower()
+            self.goFlower()
             if distance(self.pos, self.closestflowerpos) <= B_DETECT/4:
-                self.honey += 0.2
+                self.honey += 2
+        elif self.seeking_honey == False: # If it is no longer seeking honey.
+            self.goHive()
     
     def goFlower(self):
         # get vector from closest flower and itself
         # im not sure why but the current implementation the bees are circling the flowers
-        if distance(self.pos, self.closestflowerpos) <= B_DETECT: 
+        if distance(self.pos, self.closestflowerpos) <= B_DETECT*3: 
             diffVec = + self.closestflowerpos - self.pos
             # normalise it, multiply by speed, and multplied by distance from flower
             outputVec = pygame.math.Vector2(diffVec) * self.speed * distance(self.closestflowerpos, self.pos)
 
             self.applyForce(outputVec)
+
+    def goHive(self):
+        hive_pos = self.hive.pos
+
+        diffVec = hive_pos - self.pos
+        # print((pygame.math.Vector2.magnitude(diffVec)))
+
+        if (pygame.math.Vector2.magnitude(diffVec) <= 4):
+            print("enter hive")
+            self.enter_hive()
+        else:
+            force_applied = pygame.math.Vector2.normalize(diffVec) * self.speed
+
+            self.applyForce(force_applied)
+
+    def enter_hive(self):
+        self.hive.bees_inside.append(self)
+        self.hive.bees_outside.remove(self)
 
     def calculateForces(self, manager):
         # behaviours of bees:
@@ -573,7 +602,7 @@ class Creature():
         # The separation rule makes the boids avoid bumping into each other. This is done by calculating the distance between the current boid and all the other boids in the group. If the distance is less than a certain threshold, then the boid will move away from the other boid. This is done by calculating the vector from the current boid to the other boid. This vector is then normalized and multiplied by the speed of the boid. This is done in order to make sure that the boids do not move too fast.
         sepForce = pygame.Vector2(0,0)
 
-        for bee in manager.creatures:
+        for bee in self.hive.bees_outside:
             dist = distance(bee.pos, self.pos)
             if dist <= B_DETECT and bee.pos != self.pos:
                 diffVec = bee.pos - self.pos
@@ -592,7 +621,7 @@ class Creature():
         avgV = pygame.Vector2(0,0)
         counter = 0
 
-        for bee in manager.creatures:
+        for bee in self.hive.bees_outside:
             dist = distance(bee.pos, self.pos)
             if B_SEP_THRESHOLD < dist <= B_DETECT and bee.pos != self.pos:
                 avgV += bee.velocity
@@ -614,7 +643,7 @@ class Creature():
     def cohesion(self, manager):
         com = pygame.Vector2(0,0) # center of mass
         counter = 0
-        for bee in manager.creatures:
+        for bee in self.hive.bees_outside:
             dist = distance(bee.pos, self.pos)
             if B_SEP_THRESHOLD < dist <= B_DETECT and bee.pos != self.pos:
                 counter += 1
@@ -637,6 +666,9 @@ class Creature():
         pygame.draw.circle(screen, self.colour, self.screen_pos, (self.size_scaled+2)) 
         if self.selected == True:
             pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, (self.size_scaled+3), 2) 
+            pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, self.size_scaled+B_DETECT*scaled, 2) # Drawing Detect Radius
+            # pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, self.size_scaled+B_DETECT*3*scaled, 2)
+            pygame.draw.circle(screen, (255,0,0), self.screen_pos, self.size_scaled+B_SEP_THRESHOLD*scaled, 2) # Drawing avoid radius
 
         # drawing creature's ""eyes""
         # for i in self.sensors:
@@ -651,7 +683,6 @@ class Creature():
         # code on writing bee behaviour INSIDE the hive. i can tbe bothered so everything might be in this ONE function
         # self.hive_pos = (pygame.Vector2(random.randint(880, 1270), 650)) # temp screen pos inside hive
         # print(self.pos)
-        self.hive_pos = hivepos2screen(pygame.Vector2(random.randint(0,40), random.randint(0,40))) # to see if the function works. (it does!)
         # print(self.hive_pos)
         
         pygame.draw.circle(screen, self.colour, self.hive_pos, (self.size_scaled+2)) 
@@ -664,7 +695,7 @@ sim = Simulation()
 sim.add_hive(Hive(10,10, sim))
 
 
-for i in range(10):
+for i in range(25):
     sim.add_flo(Flower(random.randint(10,118), random.randint(10,118)))
 
 
@@ -724,6 +755,7 @@ def main():
 
         pygame.display.flip()
         clock.tick(FPS)
+        pygame.display.set_caption(f"simulation | {round(clock.get_fps(), 2)} fps")
     
 
     pygame.quit()
