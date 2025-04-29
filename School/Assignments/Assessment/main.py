@@ -324,9 +324,32 @@ class Simulation():
             
             bees_inside = self.selected_hive.bees_inside
 
+            self.combs = []
+            radius = 1
+            radius_long = radius/np.cos(np.pi/6)
+            tringle_len = radius*np.tan(np.pi/6)
+
+            horizontal_diff = 2 * radius_long + tringle_len
+            for i in range(10):
+                y_pos = (5 + i * (2*radius))
+                if i % 2 == 0:
+                    offset_val = 1 + np.tan(np.pi/6)
+                else:
+                    offset_val = 0
+                print(offset_val)
+                for j in range(10):
+                    x_pos = 5 + j * (horizontal_diff) + offset_val
+                    self.combs.append((x_pos, y_pos))
+
+            # print(self.combs)
+
+            for comb_center in self.combs:
+                h_pos = hivepos2screen(pygame.Vector2(comb_center))
+                # print(h_pos)
+                pygame.draw.circle(screen, (255, 0, 0), h_pos, radius*10+2, 2)
+
             for bee in bees_inside:
                 bee.draw_inside_hive()
-
 
 
 class Flower():
@@ -372,12 +395,14 @@ class Hive():
         self.bees_inside = []
         self.bees_outside = []
 
+        
+
         self.internal_cooldown = 0
 
         self.beelook = 0
 
         self.size = self.workerspop + self.queenpop
-        print(self.size)
+        # print(self.size)
 
         for i in range(self.workerspop):
             offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
@@ -389,11 +414,15 @@ class Hive():
     def update(self, manager):
         # self.size = self.workerspop + self.queenpop
         # checks if it is selected
+        if self.beelook >= len(self.bees_inside): # resets beelook (the poninter in array) if its past the length of arr
+            self.beelook = 0
+
         self.size = scaled*4
         if self.internal_cooldown == 0 and len(self.bees_inside) > 0:
             # bee to look at variable
 
             # for every bee in inside
+            # print(len(self.bees_inside), self.beelook)
             bee = self.bees_inside[self.beelook]
             if bee.seeking_honey == True:
                 self.bees_inside.pop(self.beelook) # always pops the 0th bee 
@@ -401,8 +430,6 @@ class Hive():
             else:
                 self.beelook += 1
             self.internal_cooldown = H_BEE_COOLDOWN
-        elif len(self.bees_inside) == 0:
-            self.beelook = 0
         elif self.internal_cooldown > 0 :
             self.internal_cooldown -= 1
 
@@ -546,7 +573,7 @@ class Creature():
         if self.seeking_honey == True:
             self.goFlower()
             if distance(self.pos, self.closestflowerpos) <= B_DETECT/4:
-                self.honey += 2
+                self.honey += 0.5
         elif self.seeking_honey == False: # If it is no longer seeking honey.
             self.goHive()
     
