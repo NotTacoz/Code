@@ -329,7 +329,7 @@ class Simulation():
             radius_long = radius/np.cos(np.pi/6)
             tringle_len = radius*np.tan(np.pi/6)
 
-            horizontal_diff = 2 * radius_long + tringle_len
+            horizontal_diff = radius_long + tringle_len
             for i in range(10):
                 y_pos = (5 + i * (2*radius))
                 if i % 2 == 0:
