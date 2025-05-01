@@ -38,7 +38,7 @@ B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
 B_DETECT = 2 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
-B_SEP_THRESHOLD = 0.5# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
+B_SEP_THRESHOLD = 1# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
 B_MAX_V = 0.1 # max velocit
 B_MIN_V = 0.02
 
@@ -261,7 +261,7 @@ class Simulation():
                 screen_pos = gridpos2screen(bee.pos)
                 diff = pygame.math.Vector2.magnitude(screen_pos - click_vec)
                 if diff <= bee.radius:
-                    print("omg clicked on bee")
+                    # print("omg clicked on bee")
                     self.selected_bee = bee
                     clicked = True # breaks out of the for loop
 
@@ -329,14 +329,14 @@ class Simulation():
             radius_long = radius/np.cos(np.pi/6)
             tringle_len = radius*np.tan(np.pi/6)
 
-            horizontal_diff = radius_long + tringle_len
+            horizontal_diff = 2*radius
             for i in range(10):
-                y_pos = (5 + i * (2*radius))
+                y_pos = (5 + i*(2*radius_long))
                 if i % 2 == 0:
-                    offset_val = 1 + np.tan(np.pi/6)
+                    offset_val = radius
                 else:
                     offset_val = 0
-                print(offset_val)
+                # print(offset_val)
                 for j in range(10):
                     x_pos = 5 + j * (horizontal_diff) + offset_val
                     self.combs.append((x_pos, y_pos))
@@ -346,7 +346,8 @@ class Simulation():
             for comb_center in self.combs:
                 h_pos = hivepos2screen(pygame.Vector2(comb_center))
                 # print(h_pos)
-                pygame.draw.circle(screen, (255, 0, 0), h_pos, radius*10+2, 2)
+                pygame.draw.circle(screen, (255, 255, 0), h_pos, 11*radius, 2)
+
 
             for bee in bees_inside:
                 bee.draw_inside_hive()
@@ -456,7 +457,7 @@ class Creature():
 
         self.hive = hive
 
-        self.hive_pos = hivepos2screen(pygame.Vector2(random.randint(0,40), random.randint(0,40))) # to see if the function works. (it does!)
+        self.hive_pos = (pygame.Vector2(random.randint(0,40), random.randint(0,40))) # to see if the function works. (it does!)
 
         # self.sensors = [[0, 5], [50, 7]]
 
@@ -480,16 +481,22 @@ class Creature():
 
         self.radius = (self.size_scaled+2)
 
+        self.selectedframe = random.randint(0, 5) # this is used to give the bee a random frame of the 5 frames, to ensure that the bee has a different, more random cycle. 
+        # im not entirely sure if this actually does anything
+
     def update(self, manager):
-        global mouse
-        global scaled
+        # global mouse
+        # global scaled
 
         # print("my current pos is: ", self.pos)
         self.acceleration = pygame.Vector2(0,0) # reset acceleration
         
         self.whatamidoing()
 
-        self.calculateForces(manager) # calculates all the forces to do/add
+        if frames % 5 == self.selectedframe:
+            self.calculateForces(self.hive.bees_outside, self.pos) # calculates all the forces to do/adds
+
+        # self.calculateForces(self.hive.bees_outside, self.pos) # calculates all the forces to do/adds
 
         self.seekFlowers(manager.flowers)
 
@@ -605,35 +612,51 @@ class Creature():
         self.hive.bees_inside.append(self)
         self.hive.bees_outside.remove(self)
 
-    def calculateForces(self, manager):
+    def calculateForces(self, bees, beepos):
         # behaviours of bees:
         # 1. flocking: boid behaviour with their 3 rules: 1. avoid other bees, 2. same speed as other bees, tend towards the center of a flock
         # 2. go to flowers
         # 3. random deviations in movement
-        self.applyForce(self.separation(manager) + self.align(manager) + self.cohesion(manager) +self.avoidedge(manager))
+        self.applyForce(self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos) +self.avoidedge(beepos))
 
-    def avoidedge(self, manager):
+    def avoidedge(self, beepos):
         force = pygame.Vector2(0,0)
-        if self.pos.x <= 1:
-            force+=(pygame.Vector2(0.1, 0) * abs(self.pos.x -  5))
-        elif self.pos.x >= MAP_SIZE - 1:
-            force+=(pygame.Vector2(-0.1, 0) * abs(self.pos.x -  5))
-        if self.pos.y <= 1:
-            force+=(pygame.Vector2(0, 0.1) * abs(self.pos.y - 5))
-        elif self.pos.y >= MAP_SIZE - 1:
-            force+=(pygame.Vector2(0, -0.1) * abs(self.pos.y -  5))
+
+        if self in self.hive.bees_inside:
+            real_hive_pos = (self.hive_pos)
+            if real_hive_pos.x <= 1:
+                force+=(pygame.Vector2(0.1, 0))
+            elif real_hive_pos.x >= (39):
+                force+=(pygame.Vector2(-0.1, 0))
+            if real_hive_pos.y <= (1):
+                force+=(pygame.Vector2(0, 0.1))
+            elif real_hive_pos.y >= (39):
+                force+=(pygame.Vector2(0, -0.1))
+        else:
+            if beepos.x <= 1:
+                force+=(pygame.Vector2(0.1, 0) * abs(beepos.x -  5))
+            elif beepos.x >= MAP_SIZE - 1:
+                force+=(pygame.Vector2(-0.1, 0) * abs(beepos.x -  5))
+            if beepos.y <= 1:
+                force+=(pygame.Vector2(0, 0.1) * abs(beepos.y - 5))
+            elif beepos.y >= MAP_SIZE - 1:
+                force+=(pygame.Vector2(0, -0.1) * abs(beepos.y -  5))
         return(force)
         # note to self: add bottom left right border  too! future note: done!
 
-    def separation(self, manager):
+    def separation(self, bees, beepos):
         # The separation rule makes the boids avoid bumping into each other. This is done by calculating the distance between the current boid and all the other boids in the group. If the distance is less than a certain threshold, then the boid will move away from the other boid. This is done by calculating the vector from the current boid to the other boid. This vector is then normalized and multiplied by the speed of the boid. This is done in order to make sure that the boids do not move too fast.
         sepForce = pygame.Vector2(0,0)
 
-        for bee in self.hive.bees_outside:
-            dist = distance(bee.pos, self.pos)
-            if dist <= B_DETECT and bee.pos != self.pos:
-                diffVec = bee.pos - self.pos
-                # print(abs(distance(diffVec, self.pos)))
+        for bee in bees: 
+            if beepos == self.hive_pos:
+                detectpos = bee.hive_pos
+            else: detectpos = bee.pos
+
+            dist = distance(detectpos, beepos)
+            if dist <= B_DETECT and detectpos != beepos:
+                diffVec = detectpos - beepos
+                # print(abs(distance(diffVec, beepos)))
                 if abs(dist) <= B_SEP_THRESHOLD:
                     nomVec = pygame.Vector2.normalize(diffVec)
                     # print("Sep")
@@ -644,13 +667,17 @@ class Creature():
 
 
     # aligns the boid/bee to the average direction of its nearest "flock"
-    def align(self, manager):
+    def align(self, bees, beepos):
         avgV = pygame.Vector2(0,0)
         counter = 0
 
-        for bee in self.hive.bees_outside:
-            dist = distance(bee.pos, self.pos)
-            if B_SEP_THRESHOLD < dist <= B_DETECT and bee.pos != self.pos:
+        for bee in bees: 
+            if beepos == self.hive_pos:
+                detectpos = bee.hive_pos
+            else: detectpos = bee.pos
+
+            dist = distance(detectpos, beepos)
+            if B_SEP_THRESHOLD < dist <= B_DETECT and detectpos != beepos:
                 avgV += bee.velocity
                 counter += 1
 
@@ -659,7 +686,7 @@ class Creature():
 
             alignD = pygame.Vector2.normalize(alignV) * self.speed * 0.5 # 0.5 is arbitrary value to make the align force weaker
 
-            # if self == manager.selected_bee:
+            # if self == bees.selected_bee:
             #     print(f"align dir {alignD}")
 
             return(alignD)
@@ -667,21 +694,32 @@ class Creature():
         return (avgV)
 
     # aims the bee towards to center of the ""flock""
-    def cohesion(self, manager):
+    def cohesion(self, bees, beepos):
         com = pygame.Vector2(0,0) # center of mass
         counter = 0
-        for bee in self.hive.bees_outside:
-            dist = distance(bee.pos, self.pos)
-            if B_SEP_THRESHOLD < dist <= B_DETECT and bee.pos != self.pos:
-                counter += 1
-                com += bee.pos
+        for bee in bees:
+            if beepos == self.hive_pos:
+                detectpos = bee.hive_pos
+            else: detectpos = bee.pos
 
-        if counter != 0:
+            dist = distance(detectpos, beepos)
+            if B_SEP_THRESHOLD < dist <= B_DETECT and detectpos != beepos:
+                counter += 1
+                com += detectpos
+
+        if counter != 0 and com != beepos: # makes sure magnitude of diff != 0
             com /= counter
 
-            diff = com - self.pos
+            diff = com - beepos
+
+            if pygame.math.Vector2.magnitude(diff) == 0:
+                return (com) # i think this fixes the error below im not sure
+                print("special return when diff = 0")
 
             dir = pygame.Vector2.normalize(diff) * self.speed
+            ## known bug:     dir = pygame.Vector2.normalize(diff) * self.speed
+#           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# ValueError: Can't normalize Vector of length zero
 
             # print("applying force of, ", dir)
             return(dir)
@@ -712,7 +750,33 @@ class Creature():
         # print(self.pos)
         # print(self.hive_pos)
         
-        pygame.draw.circle(screen, self.colour, self.hive_pos, (self.size_scaled+2)) 
+        self.acceleration = pygame.Vector2(0,0) # reset acceleration
+        
+        self.calculateForces(self.hive.bees_inside, (self.hive_pos))
+
+        self.velocity += self.acceleration
+        
+        fac = 30 # angle factor
+        rotate = (random.random() - 0.5)*fac
+        self.velocity = pygame.math.Vector2.rotate(self.velocity, rotate)
+        
+        self.speed = pygame.math.Vector2.magnitude(self.velocity)
+
+        if self.speed >= B_MAX_V:
+            self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MAX_V
+        if self.speed <= B_MIN_V:
+            self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MIN_V
+        self.speed = pygame.math.Vector2.magnitude(self.velocity)
+        # print(self.velocity
+
+        # map velocity + dampen
+        # mapvalue = (1-(maparr[round(self.pos.x), round(self.pos.y)]))**(1/5)
+        # if mapvalue >= 0.865: mapvalue = 0.99
+        # self.velocity *= mapvalue**(1/5) # dampens
+
+        self.hive_pos += (self.velocity)
+
+        pygame.draw.circle(screen, self.colour, hivepos2screen(self.hive_pos), (self.energy/20)) 
         # print("wow you are drawing me") # LOL
 
 
