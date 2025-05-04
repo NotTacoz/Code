@@ -392,7 +392,6 @@ class Hive():
         self.bees_outside = []
 
         
-
         self.internal_cooldown = 0
 
         self.beelook = 0
@@ -426,7 +425,7 @@ class Hive():
             for j in range(10):
                 x_pos = 5 + j * (horizontal_diff) + offset_val
                 self.combs.append((x_pos, y_pos))
-                self.combs_honey[i, j] = random.randint(0,100) # init
+                # self.combs_honey[i, j] = 0 # init
 
         print(self.combs_honey)
 
@@ -469,7 +468,7 @@ class Creature():
         
         self.energy = CR_INITIAL_ENERGY
 
-        self.honey = 0
+        self.honey = 80
 
         self.angle = 0
 
@@ -620,7 +619,7 @@ class Creature():
         # print((pygame.math.Vector2.magnitude(diffVec)))
 
         if (pygame.math.Vector2.magnitude(diffVec) <= 4):
-            print("enter hive")
+            # print("enter hive")
             self.enter_hive()
         else:
             force_applied = pygame.math.Vector2.normalize(diffVec) * self.speed
@@ -764,10 +763,19 @@ class Creature():
         #     pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*scaled, width=2)
 
     def dohoneythings(self):
-        # 1. search for all combs inside hive
-        for comb in self.hive.combs:
-            print(comb)
-        # 2. find location 
+        # 1. search for all combs inside hive to find first comb with not max honey
+        i = 0 # counter
+        for comb_honey in self.hive.combs_honey:
+            for comb_honey_actual in comb_honey:
+                if comb_honey_actual <= 100: # if it is not max:
+                    comb_pos = pygame.math.Vector2(self.hive.combs[i][0], self.hive.combs[i][1])
+                    # print(comb_pos)
+            i+=1
+        # 2. dif fpos from self
+        diff = comb_pos - self.hive_pos
+        if pygame.math.Vector2.magnitude(diff) != 0 and comb_pos:
+            nomForce = pygame.math.Vector2.normalize(diff) * self.speed
+            self.applyForce(nomForce)
 
     def draw_inside_hive(self):
         # code on writing bee behaviour INSIDE the hive. i can tbe bothered so everything might be in this ONE function
