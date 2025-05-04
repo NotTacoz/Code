@@ -764,7 +764,10 @@ class Creature():
         #     pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*scaled, width=2)
 
     def dohoneythings(self):
-        pass
+        # 1. search for all combs inside hive
+        for comb in self.hive.combs:
+            print(comb)
+        # 2. find location 
 
     def draw_inside_hive(self):
         # code on writing bee behaviour INSIDE the hive. i can tbe bothered so everything might be in this ONE function
