@@ -43,7 +43,7 @@ B_MAX_V = 0.1 # max velocit
 B_MIN_V = 0.02
 
 # hive constant
-H_INITIAL_WORKERS = 100
+H_INITIAL_WORKERS = 50
 H_INITIAL_QUEENS = 1
 H_BEE_COOLDOWN = 3 # number of frames before a bee can exit/enter
 
@@ -324,29 +324,24 @@ class Simulation():
             
             bees_inside = self.selected_hive.bees_inside
 
-            self.combs = []
-            radius = 1
-            radius_long = radius/np.cos(np.pi/6)
-            tringle_len = radius*np.tan(np.pi/6)
 
-            horizontal_diff = 2*radius
-            for i in range(10):
-                y_pos = (5 + i*(2*radius_long))
-                if i % 2 == 0:
-                    offset_val = radius
-                else:
-                    offset_val = 0
-                # print(offset_val)
-                for j in range(10):
-                    x_pos = 5 + j * (horizontal_diff) + offset_val
-                    self.combs.append((x_pos, y_pos))
+            # print(self.selected_hive.combs_honey)
 
             # print(self.combs)
+                
+            col = pygame.Color(0)
+            i = 0 # counter
+            for comb_center in self.selected_hive.combs:
+                # print(math.floor(i/10), i % 10 )
+                honey = self.selected_hive.combs_honey[math.floor(i/10), i % 10]
 
-            for comb_center in self.combs:
+                col.hsla =((20+40*honey/100, 100, 50*honey/100+15, 100))
+
                 h_pos = hivepos2screen(pygame.Vector2(comb_center))
                 # print(h_pos)
-                pygame.draw.circle(screen, (255, 255, 0), h_pos, 11*radius, 2)
+                pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
+
+                i+=1
 
 
             for bee in bees_inside:
@@ -411,6 +406,29 @@ class Hive():
 
             sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
             self.bees_inside.append(temp_bee)
+
+        self.combs = []
+        self.combs_honey = np.zeros((10,10))
+        radius = 1
+        radius_long = radius/np.cos(np.pi/6)
+        tringle_len = radius*np.tan(np.pi/6)
+
+        # 25, 15 -> 50, 55 (diff of 25/100, 40/100)
+
+        horizontal_diff = 2*radius
+        for i in range(10):
+            y_pos = (5 + i*(2*radius_long))
+            if i % 2 == 0:
+                offset_val = radius
+            else:
+                offset_val = 0
+            # print(offset_val)
+            for j in range(10):
+                x_pos = 5 + j * (horizontal_diff) + offset_val
+                self.combs.append((x_pos, y_pos))
+                self.combs_honey[i, j] = random.randint(0,100) # init
+
+        print(self.combs_honey)
 
     def update(self, manager):
         # self.size = self.workerspop + self.queenpop
@@ -542,6 +560,7 @@ class Creature():
 
         if self.energy <= 0:
             print("creature ran out of energy :(")
+            self.hive.bees_outside.remove(self)
             manager.remove(self)
 
         self.size_raw = self.energy/500
@@ -744,6 +763,9 @@ class Creature():
         #
         #     pygame.draw.line(screen, (255, 0, 0), self.screen_pos, self.screen_pos +distance_added*scaled, width=2)
 
+    def dohoneythings(self):
+        pass
+
     def draw_inside_hive(self):
         # code on writing bee behaviour INSIDE the hive. i can tbe bothered so everything might be in this ONE function
         # self.hive_pos = (pygame.Vector2(random.randint(880, 1270), 650)) # temp screen pos inside hive
@@ -753,6 +775,8 @@ class Creature():
         self.acceleration = pygame.Vector2(0,0) # reset acceleration
         
         self.calculateForces(self.hive.bees_inside, (self.hive_pos))
+
+        self.dohoneythings() # function to fill up the honey
 
         self.velocity += self.acceleration
         
@@ -784,11 +808,11 @@ class Creature():
 sim = Simulation()
 
 sim.add_hive(Hive(10,10, sim))
+sim.add_hive(Hive(100,100, sim))
 
 
 for i in range(25):
     sim.add_flo(Flower(random.randint(10,118), random.randint(10,118)))
-
 
 
 frames = 0
