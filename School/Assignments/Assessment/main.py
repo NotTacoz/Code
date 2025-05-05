@@ -665,7 +665,9 @@ class Creature():
         # 1. flocking: boid behaviour with their 3 rules: 1. avoid other bees, 2. same speed as other bees, tend towards the center of a flock
         # 2. go to flowers
         # 3. random deviations in movement
-        self.applyForce(self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos) + self.avoidedge(beepos))
+        self.applyForce(self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos))
+
+        self.avoidedge(beepos)
 
     def avoidrock(self, beepos, manager):
         force = pygame.Vector2(0,0)
@@ -741,7 +743,7 @@ class Creature():
                     nomVec = pygame.Vector2.normalize(diffVec)
                     # print("Sep")
 
-                    sepForce += nomVec/dist * self.speed * 2.5
+                    sepForce += nomVec/dist * 2.5
 
         return(-sepForce)        
 
@@ -764,7 +766,7 @@ class Creature():
         if counter != 0 and pygame.Vector2.magnitude(avgV) != 0:
             alignV = avgV/counter
 
-            alignD = pygame.Vector2.normalize(alignV) * self.speed * 0.5 # 0.5 is arbitrary value to make the align force weaker
+            alignD = pygame.Vector2.normalize(alignV)  * 0.5 # 0.5 is arbitrary value to make the align force weaker
 
             # if self == bees.selected_bee:
             #     print(f"align dir {alignD}")
@@ -796,8 +798,9 @@ class Creature():
                 return (com) # i think this fixes the error below im not sure
                 print("special return when diff = 0")
 
-            dir = pygame.Vector2.normalize(diff) * self.speed
+            dir = pygame.Vector2.normalize(diff)             
             ## known bug:     dir = pygame.Vector2.normalize(diff) * self.speed
+
 #           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # ValueError: Can't normalize Vector of length zero
 
