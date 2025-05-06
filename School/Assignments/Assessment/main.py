@@ -18,6 +18,9 @@ INITIAL_WORLD_SIZE = 4096
 MAP_SIZE = 128
 N_OBSTACLES = 20
 
+AVOID_EDGE_MARGIN = 5
+AVOID_EDGE_STRENGTH = 1
+
 # colours
 BACKGROUND_FILL = (50,50,50)
 CR_HOVER_COLOUR = (0, 255, 0)
@@ -252,15 +255,15 @@ class Simulation():
                 pos_y = center_y - obstacle.size + j
                 # print(i,j, obstacle.size*2-1)
                 if (i == 0 or i == 2*obstacle.size-1) or (j == 0 or j == 2*obstacle.size-1):
-                    print(pos_x, pos_y, obstacle.size, obstacle.pos)
+                    # print(pos_x, pos_y, obstacle.size, obstacle.pos)
                     self.obstaclemap[pos_x, pos_y] = 1
-        print(self.obstaclemap)
+        # print(self.obstaclemap)
 
     def run(self):
         for hive in self.hives[:]:
             hive.update(self)
-            for bee in hive.bees_outside:
-                bee.update(self)
+        for bee in self.creatures[:]:
+            bee.update(self)
         for flower in self.flowers[:]:
             flower.update(self)
         for obstacle in self.obstacles[:]: 
@@ -471,8 +474,6 @@ class Hive():
         print(self.combs_honey)
 
     def update(self, manager):
-        for bee in self.bees_inside:
-            bee.calculate_inside_hive()
         # self.size = self.workerspop + self.queenpop
         # checks if it is selected
         if self.beelook >= len(self.bees_inside): # resets beelook (the poninter in array) if its past the length of arr
@@ -553,11 +554,29 @@ class Creature():
         self.acceleration = pygame.Vector2(0,0) # reset acceleration
         
         self.whatamidoing()
+        is_outside = self in self.hive.bees_outside
 
-        if frames % 5 == self.selectedframe:
-            self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
+        steering = pygame.Vector2(0,0)
 
-        self.applyForce(self.avoidrock(self.pos, manager)) # avoids obstacles EVERY frame
+        if is_outside:
+            # calculate forces every 5 frames
+            if frames % 5 == self.selectedframe:
+                steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
+
+            steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE)
+        elif not is_outside: # inside considered
+            steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40)
+
+            if self in self.hive.bees_inside:
+                self.avoidedge(self.hive_pos)
+             
+                steering += self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
+
+                if self.seeking_honey == False:
+                    self.dohoneythings() # function to fill up the honey
+
+
+        # self.applyForce(self.avoidrock(self.pos, manager)) # avoids obstacles EVERY frame
 
         # self.calculateForces(self.hive.bees_outside, self.pos) # calculates all the forces to do/adds
 
@@ -580,24 +599,12 @@ class Creature():
             self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MIN_V
         self.speed = pygame.math.Vector2.magnitude(self.velocity)
 
-        # print(self.velocity
-
-        # map velocity + dampen
-        # mapvalue = (1-(maparr[round(self.pos.x), round(self.pos.y)]))**(1/5)
-        # if mapvalue >= 0.865: mapvalue = 0.99
-        # self.velocity *= mapvalue**(1/5) # dampens
-
-        self.pos += self.velocity
+        if is_outside:
+            self.pos += self.velocity
+        else:
+            self.hive_pos += self.velocity
         
-        # print(self.velocity, self.acceleration)
-
         self.selected = (manager.selected_bee == self)
-
-        # if self.speed > max_speed:
-        #     self.velocity.x = max_speed
-        #     self.velocity.y = max_speed
-
-        ## idk anymore
 
         if frames % FPS == 0: 
             self.energy = self.energy - CR_ENERGY_DECAY
@@ -617,7 +624,8 @@ class Creature():
         self.screen_pos = gridpos2screen(self.pos)
         # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
 
-        self.draw()
+        if is_outside:
+            self.draw()
 
     def applyForce(self, force):
         # print(force)
@@ -676,60 +684,47 @@ class Creature():
         self.hive.bees_outside.remove(self)
 
     def calculateForces(self, bees, beepos, manager):
-        # behaviours of bees:
+        """This Function Calculates the basic movement of the bees following the rules of boids"""
+        # behaviours of bees: 
         # 1. flocking: boid behaviour with their 3 rules: 1. avoid other bees, 2. same speed as other bees, tend towards the center of a flock
         # 2. go to flowers
         # 3. random deviations in movement
-        self.applyForce(self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos))
+        return (self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos))
 
     def avoidrock(self, beepos, manager):
         # 1. logic to steer away from rock
         force = pygame.Vector2(0,0)
         if manager:
-            for rock in manager.obstacles:
-                # distance from rock
-                diff = -rock.pos + beepos
-                diff_norm = pygame.math.Vector2.magnitude(diff)
-                dist_detect_rock = B_DETECT - rock.size # used for later calculations
+            pass
 
-                # check if inside rock
-                if diff_norm <= B_DETECT:
-                    #
-                    # rotate = 95 * (diff_norm-rock.size)/dist_detect_rock # increases depending on how close to the rock
-                    #
-                    # self.velocity = pygame.math.Vector2.rotate(self.velocity, rotate)
-                    
-                    # print((10/(diff_norm-rock.size))**2)
+            # 2. logic to ensure collision does not occur
 
 
-                    force += -pygame.math.Vector2.normalize(diff) * self.speed * (1/(diff_norm-rock.size))**2
+        return force
+    
+    def calculate_avoid_edge_force(self, beepos, min_bound, max_bound):
+        force = pygame.Vector2(0,0)
+        
+        margin = AVOID_EDGE_MARGIN
+        strength = AVOID_EDGE_STRENGTH
 
-                    if diff_norm <= rock.size+0.5: # if inside rock
-                        # print("INSIDE ROCK WARNING")
-                        force += diff * 999999
+        if beepos.x <= min_bound+margin:
+            force.x += strength 
+        elif beepos.x >= max_bound-margin:
+            force.x -= strength
 
-                # print(rock.pos)
-
-        # 2. logic to ensure collision does not occur
+        if beepos.y <= min_bound+margin:
+            force.y+=strength
+        elif beepos.y >= max_bound - margin:
+            force.y-=strength
 
         return force
 
     def avoidedge(self, beepos):
         force = pygame.Vector2(0,0)
-
         if self in self.hive.bees_outside:
             self.pos.x = max(0, min(self.pos.x, 128))
             self.pos.y = max(0, min(self.pos.y, 128))
-
-            if beepos.x <= 1:
-                force+=(pygame.Vector2(1, 0))
-            elif beepos.x >= MAP_SIZE - 1:
-                force+=(pygame.Vector2(-1, 0))
-
-            if beepos.y <= 1:
-                force+=(pygame.Vector2(0, 1))
-            elif beepos.y >= MAP_SIZE - 1:
-                force+=(pygame.Vector2(0, -1))
         else:
             self.hive_pos.x = max(0, min(self.hive_pos.x, 40))
             self.hive_pos.y = max(0, min(self.hive_pos.y, 40))
@@ -867,43 +862,6 @@ class Creature():
             if pygame.math.Vector2.magnitude(diff) != 0:
                 nomForce = pygame.math.Vector2.normalize(diff) * self.speed
                 self.applyForce(nomForce)
-
-    def calculate_inside_hive(self):
-        # code on writing bee behaviour INSIDE the hive. i can tbe bothered so everything might be in this ONE function
-        # self.hive_pos = (pygame.Vector2(random.randint(880, 1270), 650)) # temp screen pos inside hive
-        # print(self.pos)
-        # print(self.hive_pos)
-        if self in self.hive.bees_inside:
-            self.avoidedge(self.hive_pos)
-        
-            self.acceleration = pygame.Vector2(0,0) # reset acceleration
-            
-            self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
-
-            if self.seeking_honey == False:
-                self.dohoneythings() # function to fill up the honey
-
-            self.velocity += self.acceleration
-            
-            fac = 30 # angle factor
-            rotate = (random.random() - 0.5)*fac
-            self.velocity = pygame.math.Vector2.rotate(self.velocity, rotate)
-            
-            self.speed = pygame.math.Vector2.magnitude(self.velocity)
-
-            if self.speed >= B_MAX_V:
-                self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MAX_V
-            if self.speed <= B_MIN_V:
-                self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MIN_V
-            self.speed = pygame.math.Vector2.magnitude(self.velocity)
-        # print(self.velocity
-
-        # map velocity + dampen
-        # mapvalue = (1-(maparr[round(self.pos.x), round(self.pos.y)]))**(1/5)
-        # if mapvalue >= 0.865: mapvalue = 0.99
-        # self.velocity *= mapvalue**(1/5) # dampens
-
-            self.hive_pos += (self.velocity)
             
     def draw_inside_hive(self):
         pygame.draw.circle(screen, self.colour, hivepos2screen(self.hive_pos), (self.energy/20)) 
@@ -921,7 +879,7 @@ for i in range(25):
     sim.add_flo(Flower(random.randint(10,118), random.randint(10,118)))
 
 for i in range(N_OBSTACLES):
-    sim.add_obstacles(Obstacle(random.randint(0, 127), random.randint(0, 127)))
+    sim.add_obstacles(Obstacle(random.randint(5, 123), random.randint(5, 123)))
 
 frames = 0
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
