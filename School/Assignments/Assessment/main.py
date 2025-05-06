@@ -254,7 +254,7 @@ class Simulation():
                 if (i == 0 or i == 2*obstacle.size-1) or (j == 0 or j == 2*obstacle.size-1):
                     print(pos_x, pos_y, obstacle.size, obstacle.pos)
                     self.obstaclemap[pos_x, pos_y] = 1
-        # print(self.obstaclemap)
+        print(self.obstaclemap)
 
     def run(self):
         for hive in self.hives[:]:
