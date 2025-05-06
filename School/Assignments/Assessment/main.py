@@ -41,7 +41,7 @@ B_COLFULEXP = 0.5 ## exponent to make shit more colourful
 B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff tbh)
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
-B_DETECT = 2 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
+B_DETECT = 2.5 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
 B_SEP_THRESHOLD = 1# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
 B_MAX_V = 0.1 # max velocit
 B_MIN_V = 0.02
@@ -579,6 +579,7 @@ class Creature():
             steering += self.avoidrock(self.pos, manager)
             
             self.seekFlowers(manager.flowers)
+            steering += self.avoidwater(maparr) * 0.8
         elif not is_outside: # inside considered
             steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
 
@@ -709,7 +710,7 @@ class Creature():
         # 1. flocking: boid behaviour with their 3 rules: 1. avoid other bees, 2. same speed as other bees, tend towards the center of a flock
         # 2. go to flowers
         # 3. random deviations in movement
-        return (self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos))
+        return (self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos)) * 1.2
 
     def avoidrock(self, beepos, manager):
         # 1. logic to steer away from rock
@@ -725,6 +726,24 @@ class Creature():
 
 
         return force
+
+    def avoidwater(self, maparr):
+        force = pygame.Vector2(0,0)
+
+        if self.speed == 0 or maparr.all == None:
+            return force
+        
+        direction = pygame.math.Vector2.normalize(self.velocity)
+        look_pos = pygame.Vector2(0)
+        look_pos.x = max(0, min(math.ceil(self.pos.x + direction.x), 128))
+        look_pos.y = max(0, min(math.ceil(self.pos.y + direction.y), 128))
+        # print(self.pos, look_pos)
+
+        if (maparr[int(look_pos.x)][int(look_pos.y)]) >= B_WATER_THRESH:
+            force -= direction
+
+        return force
+
     
     def calculate_avoid_edge_force(self, beepos, min_bound, max_bound):
         force = pygame.Vector2(0,0)
@@ -790,7 +809,7 @@ class Creature():
             else: detectpos = bee.pos
 
             dist = distance(detectpos, beepos)
-            if B_SEP_THRESHOLD < dist <= B_DETECT and detectpos != beepos:
+            if 0 < dist <= B_DETECT and detectpos != beepos:
                 avgV += bee.velocity
                 counter += 1
 
@@ -816,7 +835,7 @@ class Creature():
             else: detectpos = bee.pos
 
             dist = distance(detectpos, beepos)
-            if B_SEP_THRESHOLD < dist <= B_DETECT and detectpos != beepos:
+            if 0 < dist <= B_DETECT and detectpos != beepos:
                 counter += 1
                 com += detectpos
 
@@ -894,15 +913,25 @@ class Creature():
 
 sim = Simulation()
 
-sim.add_hive(Hive(10,10, sim))
-sim.add_hive(Hive(100,100, sim))
+def add_objs():
+    for i in range(2):
+        random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH:
+            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+        sim.add_hive(Hive(random_coord.x,random_coord.y, sim))
 
 
-for i in range(25):
-    sim.add_flo(Flower(random.randint(10,118), random.randint(10,118)))
+    for i in range(25):
+        random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH:
+            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+        sim.add_flo(Flower(random_coord.x, random_coord.y))
 
-for i in range(N_OBSTACLES):
-    sim.add_obstacles(Obstacle(random.randint(5, 123), random.randint(5, 123)))
+    for i in range(N_OBSTACLES):
+        random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH:
+            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+        sim.add_obstacles(Obstacle(random_coord.x, random_coord.y))
 
 frames = 0
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -919,6 +948,7 @@ screen.fill("white")
 def main():
     global scaled
     draw_background(MAP_SIZE)
+    add_objs()
     running = True
     while running:
         
