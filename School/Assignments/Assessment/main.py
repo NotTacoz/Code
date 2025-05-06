@@ -16,10 +16,10 @@ FPS=60
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
 INITIAL_WORLD_SIZE = 4096
 MAP_SIZE = 128
-N_OBSTACLES = 20
+N_OBSTACLES = 30
 
 AVOID_EDGE_MARGIN = 5
-AVOID_EDGE_STRENGTH = 1
+AVOID_EDGE_STRENGTH = 0.00007
 
 # colours
 BACKGROUND_FILL = (50,50,50)
@@ -415,13 +415,26 @@ class Obstacle():
 
         self.size = random.randint(1,3) # i made it size of a flower because, why not!
 
+        self.min_x = self.pos.x
+        self.min_y = self.pos.y
+        self.max_x = self.pos.x + self.size
+        self.max_y = self.pos.y + self.size
+
     def update(self, manager):
         self.draw()
 
+    def get_closest_point(self, obj_pos):
+        closest_point = pygame.Vector2(0,0)
+
+        closest_point.x = max(self.min_x, min(obj_pos.x, self.max_x))
+        closest_point.y = max(self.min_y, min(obj_pos.y, self.max_y))
+
+        return(closest_point)
+        
     def draw(self):
         screen_pos = gridpos2screen(self.pos)
         
-        pygame.draw.rect(screen, (80, 80, 80), (screen_pos.x, screen_pos.y, scaled*self.size, scaled*self.size), 3)
+        pygame.draw.rect(screen, (80, 80, 80), (screen_pos.x, screen_pos.y, scaled*self.size, scaled*self.size))
         
 
 
@@ -551,7 +564,6 @@ class Creature():
 
         self.avoidedge(self.pos)
         # print("my current pos is: ", self.pos)
-        self.acceleration = pygame.Vector2(0,0) # reset acceleration
         
         self.whatamidoing()
         is_outside = self in self.hive.bees_outside
@@ -563,9 +575,12 @@ class Creature():
             if frames % 5 == self.selectedframe:
                 steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
 
-            steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE)
+            steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE) * 100
+            steering += self.avoidrock(self.pos, manager)
+            
+            self.seekFlowers(manager.flowers)
         elif not is_outside: # inside considered
-            steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40)
+            steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
 
             if self in self.hive.bees_inside:
                 self.avoidedge(self.hive_pos)
@@ -580,11 +595,13 @@ class Creature():
 
         # self.calculateForces(self.hive.bees_outside, self.pos) # calculates all the forces to do/adds
 
-        self.seekFlowers(manager.flowers)
 
         # seeking flower code
 
+
+        self.applyForce(steering)
         self.velocity += self.acceleration
+        self.acceleration *= 0 # reset acceleration
 
         
         fac = 30 # angle factor
@@ -649,7 +666,7 @@ class Creature():
                 self.closestflowerpos = flower.pos
                 # print("CLOSEST FLOWER DETECTED!!", flower.pos)
         if self.seeking_honey == True:
-            self.goFlower()
+            # self.goFlower()
             if distance(self.pos, self.closestflowerpos) <= B_DETECT/4:
                 self.honey += 0.5
         elif self.seeking_honey == False: # If it is no longer seeking honey.
@@ -682,6 +699,9 @@ class Creature():
     def enter_hive(self):
         self.hive.bees_inside.append(self)
         self.hive.bees_outside.remove(self)
+#         # known error   File "/Users/thomas/Desktop/Code/School/Assignments/Assessment/main.py", line 686, in enter_hive
+#     self.hive.bees_outside.remove(self)
+# ValueError: list.remove(x): x not in list
 
     def calculateForces(self, bees, beepos, manager):
         """This Function Calculates the basic movement of the bees following the rules of boids"""
@@ -695,9 +715,13 @@ class Creature():
         # 1. logic to steer away from rock
         force = pygame.Vector2(0,0)
         if manager:
-            pass
+            for rock in manager.obstacles:
+                closest_point = rock.get_closest_point(beepos)
+                diff = beepos - closest_point
+                diff_mag = pygame.math.Vector2.magnitude(diff)
 
-            # 2. logic to ensure collision does not occur
+                if (0 < diff_mag < B_SEP_THRESHOLD):
+                    force += pygame.math.Vector2.normalize(diff) * (B_SEP_THRESHOLD-diff_mag)/(B_SEP_THRESHOLD)
 
 
         return force
@@ -709,19 +733,20 @@ class Creature():
         strength = AVOID_EDGE_STRENGTH
 
         if beepos.x <= min_bound+margin:
-            force.x += strength 
+            force.x += strength * (-(beepos.x-min_bound) + margin) 
         elif beepos.x >= max_bound-margin:
-            force.x -= strength
+            force.x -= strength * (margin + -(-beepos.x+max_bound)) 
+
 
         if beepos.y <= min_bound+margin:
-            force.y+=strength
+            force.y+=strength * (margin + -(beepos.y-min_bound)) 
+
         elif beepos.y >= max_bound - margin:
-            force.y-=strength
+            force.y-=strength * (margin + -(-beepos.y+max_bound)) 
 
         return force
 
     def avoidedge(self, beepos):
-        force = pygame.Vector2(0,0)
         if self in self.hive.bees_outside:
             self.pos.x = max(0, min(self.pos.x, 128))
             self.pos.y = max(0, min(self.pos.y, 128))
@@ -729,8 +754,6 @@ class Creature():
             self.hive_pos.x = max(0, min(self.hive_pos.x, 40))
             self.hive_pos.y = max(0, min(self.hive_pos.y, 40))
 
-
-        self.applyForce(force)
         # note to self: add bottom left right border  too! future note: done!
 
     def separation(self, bees, beepos):
