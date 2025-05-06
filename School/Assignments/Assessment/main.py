@@ -60,7 +60,7 @@ TEXT_COLOUR = (255 ,255, 255)
 pygame.init()
 pygame.font.init()
 STATS_FONT = pygame.font.SysFont("Arial", 16)
-# np.set_printoptions(threshold=sys.maxsize) # Make print np arrays more comprehensive
+np.set_printoptions(threshold=sys.maxsize) # Make print np arrays more comprehensive
 
 # 
 # HELPER FUNCTIONS
@@ -220,6 +220,8 @@ class Simulation():
         self.selected_hive = None
 
         self.obstacles = []
+
+        self.obstaclemap = np.zeros((MAP_SIZE+1, MAP_SIZE+1))
         
     def add(self,creature):
         self.creatures.append(creature)
@@ -241,6 +243,18 @@ class Simulation():
 
     def add_obstacles(self, obstacle):
         self.obstacles.append(obstacle)
+        center_x = int(obstacle.pos.x)
+        center_y = int(obstacle.pos.y)
+        size=obstacle.size
+        for i in range(2*obstacle.size):
+            pos_x = center_x - obstacle.size + i
+            for j in range(2*obstacle.size):
+                pos_y = center_y - obstacle.size + j
+                # print(i,j, obstacle.size*2-1)
+                if (i == 0 or i == 2*obstacle.size-1) or (j == 0 or j == 2*obstacle.size-1):
+                    print(pos_x, pos_y, obstacle.size, obstacle.pos)
+                    self.obstaclemap[pos_x, pos_y] = 1
+        # print(self.obstaclemap)
 
     def run(self):
         for hive in self.hives[:]:
@@ -249,7 +263,7 @@ class Simulation():
                 bee.update(self)
         for flower in self.flowers[:]:
             flower.update(self)
-        for obstacle in self.obstacles[:]:
+        for obstacle in self.obstacles[:]: 
             obstacle.update(self)
 
         # for creature in self.creatures[:]:
@@ -396,7 +410,7 @@ class Obstacle():
     def __init__(self, x, y):
         self.pos = pygame.Vector2(x, y)
 
-        self.size = 3 # i made it size of a flower because, why not!
+        self.size = random.randint(1,3) # i made it size of a flower because, why not!
 
     def update(self, manager):
         self.draw()
@@ -404,7 +418,7 @@ class Obstacle():
     def draw(self):
         screen_pos = gridpos2screen(self.pos)
         
-        pygame.draw.circle(screen, (80, 80, 80), (screen_pos.x, screen_pos.y), scaled*self.size, 4)
+        pygame.draw.rect(screen, (80, 80, 80), (screen_pos.x, screen_pos.y, scaled*self.size, scaled*self.size), 3)
         
 
 
@@ -534,6 +548,7 @@ class Creature():
         # global mouse
         # global scaled
 
+        self.avoidedge(self.pos)
         # print("my current pos is: ", self.pos)
         self.acceleration = pygame.Vector2(0,0) # reset acceleration
         
@@ -561,7 +576,7 @@ class Creature():
 
         if self.speed >= B_MAX_V:
             self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MAX_V
-        if self.speed <= B_MIN_V:
+        if 0 < self.speed <= B_MIN_V:
             self.velocity = pygame.math.Vector2.normalize(self.velocity) * B_MIN_V
         self.speed = pygame.math.Vector2.magnitude(self.velocity)
 
@@ -667,9 +682,8 @@ class Creature():
         # 3. random deviations in movement
         self.applyForce(self.separation(bees, beepos) + self.align(bees, beepos) + self.cohesion(bees, beepos))
 
-        self.avoidedge(beepos)
-
     def avoidrock(self, beepos, manager):
+        # 1. logic to steer away from rock
         force = pygame.Vector2(0,0)
         if manager:
             for rock in manager.obstacles:
@@ -685,7 +699,7 @@ class Creature():
                     #
                     # self.velocity = pygame.math.Vector2.rotate(self.velocity, rotate)
                     
-                    print((10/(diff_norm-rock.size))**2)
+                    # print((10/(diff_norm-rock.size))**2)
 
 
                     force += -pygame.math.Vector2.normalize(diff) * self.speed * (1/(diff_norm-rock.size))**2
@@ -696,33 +710,32 @@ class Creature():
 
                 # print(rock.pos)
 
+        # 2. logic to ensure collision does not occur
+
         return force
 
     def avoidedge(self, beepos):
         force = pygame.Vector2(0,0)
 
-        if self in self.hive.bees_inside:
-            real_hive_pos = (self.hive_pos)
-            if real_hive_pos.x <= 1:
-                force+=(pygame.Vector2(0.1, 0))
-            elif real_hive_pos.x >= (39):
-                force+=(pygame.Vector2(-0.1, 0))
-            if real_hive_pos.y <= (1):
-                force+=(pygame.Vector2(0, 0.1))
-            elif real_hive_pos.y >= (39):
-                force+=(pygame.Vector2(0, -0.1))
-        else:
-            if beepos.x <= 1:
-                force+=(pygame.Vector2(0.1, 0) * abs(5 - beepos.x))
-            elif beepos.x >= MAP_SIZE - 1:
-                force+=(pygame.Vector2(-0.1, 0) * abs(beepos.x - 123))
-            if beepos.y <= 1:
-                force+=(pygame.Vector2(0, 0.1) * abs(5 - beepos.y))
-            elif beepos.y >= MAP_SIZE - 1:
-                force+=(pygame.Vector2(0, -0.1) * abs(beepos.y - 123))
-            
+        if self in self.hive.bees_outside:
+            self.pos.x = max(0, min(self.pos.x, 128))
+            self.pos.y = max(0, min(self.pos.y, 128))
 
-        return(force)
+            if beepos.x <= 1:
+                force+=(pygame.Vector2(1, 0))
+            elif beepos.x >= MAP_SIZE - 1:
+                force+=(pygame.Vector2(-1, 0))
+
+            if beepos.y <= 1:
+                force+=(pygame.Vector2(0, 1))
+            elif beepos.y >= MAP_SIZE - 1:
+                force+=(pygame.Vector2(0, -1))
+        else:
+            self.hive_pos.x = max(0, min(self.hive_pos.x, 40))
+            self.hive_pos.y = max(0, min(self.hive_pos.y, 40))
+
+
+        self.applyForce(force)
         # note to self: add bottom left right border  too! future note: done!
 
     def separation(self, bees, beepos):
@@ -743,7 +756,7 @@ class Creature():
                     nomVec = pygame.Vector2.normalize(diffVec)
                     # print("Sep")
 
-                    sepForce += nomVec/dist * 2.5
+                    sepForce += nomVec/dist * self.speed * 2.5
 
         return(-sepForce)        
 
@@ -766,7 +779,7 @@ class Creature():
         if counter != 0 and pygame.Vector2.magnitude(avgV) != 0:
             alignV = avgV/counter
 
-            alignD = pygame.Vector2.normalize(alignV)  * 0.5 # 0.5 is arbitrary value to make the align force weaker
+            alignD = pygame.Vector2.normalize(alignV) * self.speed * 0.5 # 0.5 is arbitrary value to make the align force weaker
 
             # if self == bees.selected_bee:
             #     print(f"align dir {alignD}")
@@ -798,9 +811,8 @@ class Creature():
                 return (com) # i think this fixes the error below im not sure
                 print("special return when diff = 0")
 
-            dir = pygame.Vector2.normalize(diff)             
+            dir = pygame.Vector2.normalize(diff) * self.speed
             ## known bug:     dir = pygame.Vector2.normalize(diff) * self.speed
-
 #           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # ValueError: Can't normalize Vector of length zero
 
@@ -862,6 +874,7 @@ class Creature():
         # print(self.pos)
         # print(self.hive_pos)
         if self in self.hive.bees_inside:
+            self.avoidedge(self.hive_pos)
         
             self.acceleration = pygame.Vector2(0,0) # reset acceleration
             
@@ -908,7 +921,7 @@ for i in range(25):
     sim.add_flo(Flower(random.randint(10,118), random.randint(10,118)))
 
 for i in range(N_OBSTACLES):
-    sim.add_obstacles(Obstacle(random.randint(0, 128), random.randint(0, 128)))
+    sim.add_obstacles(Obstacle(random.randint(0, 127), random.randint(0, 127)))
 
 frames = 0
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
