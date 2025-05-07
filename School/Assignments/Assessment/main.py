@@ -667,7 +667,7 @@ class Creature():
                 self.closestflowerpos = flower.pos
                 # print("CLOSEST FLOWER DETECTED!!", flower.pos)
         if self.seeking_honey == True:
-            # self.goFlower()
+            self.goFlower()
             if distance(self.pos, self.closestflowerpos) <= B_DETECT/4:
                 self.honey += 0.5
         elif self.seeking_honey == False: # If it is no longer seeking honey.
@@ -735,8 +735,8 @@ class Creature():
         
         direction = pygame.math.Vector2.normalize(self.velocity)
         look_pos = pygame.Vector2(0)
-        look_pos.x = max(0, min(math.ceil(self.pos.x + direction.x), 128))
-        look_pos.y = max(0, min(math.ceil(self.pos.y + direction.y), 128))
+        look_pos.x = max(0, min(math.ceil(self.pos.x + direction.x), 127))
+        look_pos.y = max(0, min(math.ceil(self.pos.y + direction.y), 127))
         # print(self.pos, look_pos)
 
         if (maparr[int(look_pos.x)][int(look_pos.y)]) >= B_WATER_THRESH:
@@ -914,24 +914,29 @@ class Creature():
 sim = Simulation()
 
 def add_objs():
+    invalid_coords = []
+
     for i in range(2):
         random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH:
+        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
             random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
         sim.add_hive(Hive(random_coord.x,random_coord.y, sim))
+        invalid_coords.append(random_coord)
 
 
     for i in range(25):
         random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH:
+        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
             random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
         sim.add_flo(Flower(random_coord.x, random_coord.y))
+        invalid_coords.append(random_coord)
 
     for i in range(N_OBSTACLES):
         random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH:
+        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
             random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
         sim.add_obstacles(Obstacle(random_coord.x, random_coord.y))
+        invalid_coords.append(random_coord)
 
 frames = 0
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
