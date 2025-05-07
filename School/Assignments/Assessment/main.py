@@ -1,15 +1,16 @@
-import pygame
-import numpy as np
-import random
-import math
-import sys
-from noise import pnoise2
+# Imports
+import pygame # pygame is the primary library used for the simulation engine
+import numpy as np # this is for np's useful array features and maths
+import random # ensure randomised simulation on every run
+import math # additiona math functions
+import sys # for logging, debuggin
+from noise import pnoise2 # map generation
 
 # Constants
-WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
-WORLD_SIZE = 4096
-MAP_SIZE = 128
-FPS=60
+WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720 # sets up a 1280x720 display window
+WORLD_SIZE = 4096 # world size
+MAP_SIZE = 128 # how many pixels (blocks) the map will take up
+FPS=60 # frames per second
 
 ## New and Improved Updated Constants
 # Map
@@ -50,6 +51,8 @@ B_MIN_V = 0.02
 H_INITIAL_WORKERS = 50
 H_INITIAL_QUEENS = 1
 H_BEE_COOLDOWN = 3 # number of frames before a bee can exit/enter
+
+COMB_WIDTH, COMB_HEIGHT = 12, 9
 
 scaled = INITIAL_WORLD_SIZE/MAP_SIZE
 
@@ -156,7 +159,6 @@ def draw_background(size):
     # print(maparr)
 
 def update_background(size):
-    global scaled
     # print(maparr)
     start_col = math.floor(camera_offset.x / scaled)
     end_col = math.ceil((WINDOW_WIDTH + camera_offset.x) / scaled)
@@ -325,7 +327,7 @@ class Simulation():
                 "Energy": bee.energy,
                 "Honey": bee.honey,
                 "Seeking Honey?": bee.seeking_honey,
-                "Closest Flower Position": bee.closestflowerpos,
+                "Closest Flower Position": bee.closestflower.pos,
                 "Colour": bee.colour,
                 "Honey": bee.honey,
             }
@@ -351,22 +353,21 @@ class Simulation():
             
             bees_inside = self.selected_hive.bees_inside
 
-
             # print(self.selected_hive.combs_honey)
 
             # print(self.combs)
+
+
+            ## drawing the comb
                 
             col = pygame.Color(0)
             i = 0 # counter
             for comb_center in self.selected_hive.combs:
-                # print(math.floor(i/10), i % 10 )
-                honey = self.selected_hive.combs_honey[math.floor(i/10), i % 10]
-
-                col.hsla =((20+40*honey/100, 100, 50*honey/100+15, 100))
-
-                h_pos = hivepos2screen(pygame.Vector2(comb_center))
-                # print(h_pos)
-                pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
+                honey = self.selected_hive.combs_honey[math.floor(i/COMB_WIDTH), i % COMB_WIDTH]
+                if honey >= 0: # does not draw invalid combs (-1)
+                    col.hsla =((20+40*honey/100, 100, 50*honey/100+15, 100))
+                    h_pos = hivepos2screen(pygame.Vector2(comb_center))
+                    pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
 
                 i+=1
 
@@ -382,6 +383,7 @@ class Flower():
 
         self.size = F_SIZE
         self.petalCol = (random.randint(100,255), 255, random.randint(100,255)) # ts does not do anything
+        self.pollen = 100
 
         self.angle = 0 # initial angle
         self.rotspeed = 0.005 # rotational speed
@@ -389,6 +391,10 @@ class Flower():
     def update(self, manager):
         # self.angle += self.rotspeed
         self.draw()
+
+        if self.pollen <= 0:
+            manager.rem_flo(self)
+            print("I BLEW UP!!!")
 
     def draw(self):
         screen_pos = gridpos2screen(self.pos)
@@ -435,7 +441,6 @@ class Obstacle():
         screen_pos = gridpos2screen(self.pos)
         
         pygame.draw.rect(screen, (80, 80, 80), (screen_pos.x, screen_pos.y, scaled*self.size, scaled*self.size))
-        
 
 
 class Hive():
@@ -464,7 +469,7 @@ class Hive():
             self.bees_inside.append(temp_bee)
 
         self.combs = []
-        self.combs_honey = np.zeros((10,10))
+        self.combs_honey = np.zeros((9,12))
         radius = 1
         radius_long = radius/np.cos(np.pi/6)
         tringle_len = radius*np.tan(np.pi/6)
@@ -472,17 +477,30 @@ class Hive():
         # 25, 15 -> 50, 55 (diff of 25/100, 40/100)
 
         horizontal_diff = 2*radius
-        for i in range(10):
+        for i in range(9):
             y_pos = (5 + i*(2*radius_long))
             if i % 2 == 0:
                 offset_val = radius
             else:
                 offset_val = 0
             # print(offset_val)
-            for j in range(10):
+            for j in range(12):
                 x_pos = 5 + j * (horizontal_diff) + offset_val
                 self.combs.append((x_pos, y_pos))
-                # self.combs_honey[i, j] = 0 # init
+
+                fake_comb_value = -1 # a value of -1 signifies the comb is unable to be used, and only used as a placeholder!!!
+
+                # print(j,i)
+                self.combs_honey[i, j] = 0 # init
+                if ((j == 0) and (i - 3 <= 0)) or ((j==1) and (i-1 <= 0)):
+                    self.combs_honey[i,j] = fake_comb_value
+                if ((j==0) and (i+4) >= COMB_HEIGHT) or ((j==1) and (i+2 >= COMB_HEIGHT)):
+                    self.combs_honey[i,j] = fake_comb_value
+                if ((j == COMB_WIDTH-1) and (i-2 <= 0)) or ((j==COMB_WIDTH-2) and (i <= 0)):
+                    self.combs_honey[i,j] = fake_comb_value
+                if ((j== COMB_WIDTH-1) and (i+3) >= COMB_HEIGHT) or ((j== COMB_WIDTH-2) and (i+1 >= COMB_HEIGHT)):
+                    self.combs_honey[i,j] = fake_comb_value
+
 
         print(self.combs_honey)
 
@@ -511,9 +529,6 @@ class Hive():
         self.draw()
 
     def draw(self):
-        # global mouse
-        # global scaled
-
         screen_pos = gridpos2screen(self.pos)
 
         # draws the hive where its center is its coordinate self.pos (x,y)
@@ -547,7 +562,7 @@ class Creature():
 
         self.seeking_honey = True
 
-        self.closestflowerpos = pygame.Vector2(999, 999)
+        self.closestflower = None 
 
         self.size_raw = self.energy/500
 
@@ -559,9 +574,6 @@ class Creature():
         # im not entirely sure if this actually does anything
 
     def update(self, manager):
-        # global mouse
-        # global scaled
-
         self.avoidedge(self.pos)
         # print("my current pos is: ", self.pos)
         
@@ -662,24 +674,27 @@ class Creature():
         # this code essentially does step (1)
 
         for flower in flowers:
-            if distance(flower.pos, self.pos) < distance(self.pos, self.closestflowerpos):
+            if not self.closestflower:
+                self.closestflower = flower
+            if distance(flower.pos, self.pos) < distance(self.pos, self.closestflower.pos) or self.closestflower not in flowers:
                 # print(distance(flower.pos,self.pos))
-                self.closestflowerpos = flower.pos
+                self.closestflower = flower
                 # print("CLOSEST FLOWER DETECTED!!", flower.pos)
         if self.seeking_honey == True:
             self.goFlower()
-            if distance(self.pos, self.closestflowerpos) <= B_DETECT/4:
+            if distance(self.pos, self.closestflower.pos) <= B_DETECT/4:
                 self.honey += 0.5
+                self.closestflower.pollen -= 0.5
         elif self.seeking_honey == False: # If it is no longer seeking honey.
             self.goHive()
     
     def goFlower(self):
         # get vector from closest flower and itself
         # im not sure why but the current implementation the bees are circling the flowers
-        if distance(self.pos, self.closestflowerpos) <= B_DETECT*3: 
-            diffVec = + self.closestflowerpos - self.pos
+        if distance(self.pos, self.closestflower.pos) <= B_DETECT*3: 
+            diffVec = + self.closestflower.pos - self.pos
             # normalise it, multiply by speed, and multplied by distance from flower
-            outputVec = pygame.math.Vector2(diffVec) * self.speed * distance(self.closestflowerpos, self.pos)
+            outputVec = pygame.math.Vector2(diffVec) * self.speed * distance(self.closestflower.pos, self.pos)
 
             self.applyForce(outputVec)
 
@@ -890,7 +905,7 @@ class Creature():
         comb_pos = None
         for comb_honey in self.hive.combs_honey:
             for comb_honey_actual in comb_honey:
-                if comb_honey_actual <= 100: # if it is not max:
+                if 0 <= comb_honey_actual <= 100: # if it is not max and if it is not invalid
                     comb_pos = pygame.math.Vector2(self.hive.combs[i][0], self.hive.combs[i][1])
                     # print(comb_pos)
                     diff = comb_pos - self.hive_pos
