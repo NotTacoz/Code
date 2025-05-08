@@ -421,7 +421,7 @@ class Flower():
 
         self.size = F_SIZE
         self.petalCol = (random.randint(100,255), 255, random.randint(100,255)) # ts does not do anything
-        self.pollen = 100
+        self.pollen = 100000
 
         self.angle = 0 # initial angle
         self.rotspeed = 0.005 # rotational speed
@@ -452,6 +452,17 @@ class Flower():
         #
         pygame.draw.circle(screen, self.petalCol, (screen_pos), scaled)
 
+class Node():
+    def __init__(self, parent=None, position=None):
+        self.parent=parent
+        self.position=position
+
+        self.g = 0
+        self.h = 0
+        self.f = 0
+
+    def __eq__(self, other):
+        self.position = other.position
 
 class Obstacle():
     def __init__(self, x, y):
@@ -609,11 +620,14 @@ class Creature():
         self.radius = (self.size_scaled+2)
 
         self.selectedframe = random.randint(0, 5) # this is used to give the bee a random frame of the 5 frames, to ensure that the bee has a different, more random cycle. 
+
         # im not entirely sure if this actually does anything
 
     def update(self, manager):
         self.avoidedge(self.pos)
         # print("my current pos is: ", self.pos)
+        if frames == 1:
+            self.a_star_pathfind(manager.background.maparr, pygame.Vector2(0,0), pygame.Vector2(50,50))
         
         self.whatamidoing()
         is_outside = self in self.hive.bees_outside
@@ -704,6 +718,85 @@ class Creature():
 
         if self.honey >= self.min_honey:
             self.seeking_honey = False
+
+    def a_star_pathfind(self, maparr, in_pos, target_pos):
+        """note about this implementation:
+        1. only works on grid (in this case MAP_SIZExMAP_SIZE which is 128x)
+        2. i am schizophrenic so this might not wor
+        3. this is based off random pseudocode i found in google images
+        """
+        start_node=Node(None, in_pos)
+        start_node.g = start_node.h + start_node.f 
+        end_node=Node(None, target_pos)
+        end_node.g = end_node.h + end_node.f
+        
+
+        closed_list = [] # list of nodes that hasnt been searched
+        open_list = [start_node] # the list of the nodes we have looked at
+
+        while len(open_list) > 0: # when the list of open nodes is empty, which is unexpected, so it should return failure
+            current_node = open_list[0] # for each current_node in the open current_node
+
+            print(len(closed_list), len(open_list))
+
+            open_list.pop(0)
+            closed_list.append(current_node)
+
+            if current_node.position == target_pos: # if we have reached the destination
+                path = []
+                path.append(current_node)
+                
+                parent = current_node.parent
+
+                while parent != None:
+                    path.append(current_node.position)
+                    parent = current_node.parent
+
+                return(path[::-1]) # return path but reversed
+            
+
+            # creating children
+            # gets 3x3 grid around center
+            for i in range(-1,2): #i is x 
+                for j in range(-1,2): # j is y
+                    if (i != 0 and j != 0) and (0 < current_node.position.x + i < MAP_SIZE and 0 < current_node.position.y+j < MAP_SIZE): # if not the center, or is not valid
+                        child_node = Node(current_node, pygame.Vector2(current_node.position.x + i, current_node.position.y + j))
+                        # print(child_node.position)
+
+                        bruh = False
+
+                        for look_child in closed_list:
+                            if child_node.position == look_child.position:
+                                # print("breaking off the loop")
+                                bruh = True
+
+                        # print(child_node.position)
+                        if maparr[int(child_node.position.x), int(child_node.position.y)] == B_WATER_THRESH:
+                            bruh = True
+
+                        if bruh == False:
+                            dontappend = False
+
+                            child_node.g  = current_node.g + 1
+                            child_node.h = distance(child_node.position, end_node.position)
+                            child_node.f = child_node.g + child_node.f
+
+                            for open_node in open_list:
+                                if child_node.position == open_node.position and child_node.g > open_node.g:
+                                    dontappend = True
+                            
+                            if dontappend == False:
+                                open_list.append(child_node)
+                        
+
+                        # print (current_node.position.x + i, current_node.position.x + j)
+                       # pass
+            
+        
+
+
+
+
 
     def seekFlowers(self, flowers):
         # 1. find closest flower
