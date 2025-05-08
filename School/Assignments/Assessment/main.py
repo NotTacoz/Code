@@ -6,17 +6,15 @@ import math # additiona math functions
 import sys # for logging, debuggin
 from noise import pnoise2 # map generation
 
-# Constants
+# General Constants
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720 # sets up a 1280x720 display window
 WORLD_SIZE = 4096 # world size
 MAP_SIZE = 128 # how many pixels (blocks) the map will take up
 FPS=60 # frames per second
+TEXT_COLOUR = (255 ,255, 255)
 
 ## New and Improved Updated Constants
 # Map
-WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
-INITIAL_WORLD_SIZE = 4096
-MAP_SIZE = 128
 N_OBSTACLES = 30
 
 AVOID_EDGE_MARGIN = 5
@@ -26,7 +24,7 @@ AVOID_EDGE_STRENGTH = 0.00007
 BACKGROUND_FILL = (50,50,50)
 CR_HOVER_COLOUR = (0, 255, 0)
 # Camera
-CA_SCROLL_SPEED = 30
+CA_SCROLL_SPEED = 25
 CA_BORDER_MARGIN = 5
 
 # Creature
@@ -43,7 +41,7 @@ B_COLLESEXP = 1.1 ## exponent to make shit more duller (idk ts some wizard stuff
 B_BORDER = 0.5 # darkerns the border by this much (reduces rgb by a factor of ts)
 B_BORDERTHRESH = 8 # size of a tile in order for border to be drawn
 B_DETECT = 2.5 # THIS IS VERY IMPORTANT ! THIS IS THE BEE DETECTION RADIUS OF EVERYTHING
-B_SEP_THRESHOLD = 1# IMPORTANT FOR SEPARATION. this is the min distance a boid/bee wants to be from another bee
+B_SEP_THRESHOLD = 0.7
 B_MAX_V = 0.1 # max velocit
 B_MIN_V = 0.02
 
@@ -51,22 +49,17 @@ B_MIN_V = 0.02
 H_INITIAL_WORKERS = 50
 H_INITIAL_QUEENS = 1
 H_BEE_COOLDOWN = 3 # number of frames before a bee can exit/enter
-
-COMB_WIDTH, COMB_HEIGHT = 12, 9
-
-scaled = INITIAL_WORLD_SIZE/MAP_SIZE
+COMB_WIDTH, COMB_HEIGHT = 12, 9 # comb size in hive
 
 # FLOWERS
 F_SIZE = 8 # unscaled
 
-# fonts
-TEXT_COLOUR = (255 ,255, 255)
-
 ## INITIALISATION !!!
+scaled = WORLD_SIZE/MAP_SIZE
 pygame.init()
 pygame.font.init()
 STATS_FONT = pygame.font.SysFont("Arial", 16)
-np.set_printoptions(threshold=sys.maxsize) # Make print np arrays more comprehensive
+# np.set_printoptions(threshold=sys.maxsize) # Make print np arrays more comprehensive
 
 # 
 # HELPER FUNCTIONS
@@ -83,11 +76,12 @@ def is_hovered(screen_width, screen_height, screen_pos):
     else:
         return False
 
-def gridpos2screen(x):
+def gridpos2screen(x, camera_offset):
+    """converts grid coords to screen coords"""
     # print(MAP_SIZE) # should be 128x128 by default
     return (x * scaled - camera_offset)
     
-def screenpos2grid(x):
+def screenpos2grid(x, camera_offset):
     return ((x+camera_offset)/scaled)
 
 def hivepos2screen(x):
@@ -106,111 +100,107 @@ def draw_text(surface, text, font, colour, position, anchor="topleft"):
     setattr(text_rect, anchor, position)
     surface.blit(text_surface, text_rect)
 
-def check_mouse_movement():
-    global camera_offset
-    
-    mouse = pygame.math.Vector2(pygame.mouse.get_pos())
-
-    mouse_offset = pygame.Vector2(0,0)
-
-    # # set up camera borders
-    # left_border = self.camera_borders['left']
-    # top_border = self.camera_borders['top'] 
-    # right_border = self.display_surface.get_size()[0] - self.camera_borders['right']
-    # bottom_border = self.display_surface.get_size()[1] - self.camera_borders['bottom']
-
-    if mouse.y <= 0:
-        mouse_offset.y = -25
-    elif mouse.y >= WINDOW_HEIGHT - 1:
-        mouse_offset.y = 25
-    
-    if mouse.x == 0:
-        mouse_offset.x = -25
-    elif mouse.x >= WINDOW_WIDTH - 1:
-        mouse_offset.x = 25
-
-    camera_offset += mouse_offset
 
 def get_sigmoid(x):
     return (1/(1+math.exp(-x)))
 
 maparr = []
 
-def draw_background(size):
-    test = []
-    x_offset = random.uniform(0,10000)
-    y_offset = random.uniform(0,10000)
-    # print("drawing background")
-    global maparr
-    maparr = np.zeros((size,size), dtype=float)
-    for i in range(len(maparr)):
-        for j in range(len(maparr[i])):
-            pno = pnoise2((i+x_offset)*B_NOISE_SCALE/size, (j+y_offset)*B_NOISE_SCALE/size, B_NOISE_OCTAVE)
-            pno = (pno+1)/2
-            maparr[i][j] = pno
-            test.append(maparr[i][j])
+class Environment():
+    def __init__(self, size, manager):
+                # square.fill(col)
+                # pixel_draw = pygame.Rect(5*(i+1), 5*(j+1), 15, 15)
+                # screen.blit(square, pixel_draw)
+        # print(np.mean(test))
+        # pygame.draw.circle(screen, "black", (30, 30), 500)
 
-    update_background(size)
-            # square.fill(col)
-            # pixel_draw = pygame.Rect(5*(i+1), 5*(j+1), 15, 15)
-            # screen.blit(square, pixel_draw)
-    # print(np.mean(test))
-    # pygame.draw.circle(screen, "black", (30, 30), 500)
-    # print(maparr)
+        self.map_world_surface = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
+        self.generate_background_texture(size)
 
-def update_background(size):
-    # print(maparr)
-    start_col = math.floor(camera_offset.x / scaled)
-    end_col = math.ceil((WINDOW_WIDTH + camera_offset.x) / scaled)
-    start_row = math.floor((camera_offset.y) / scaled)
-    end_row = math.ceil((camera_offset.y + WINDOW_HEIGHT) / scaled)
+        self.cached_bg = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.cached_camera_offset = pygame.Vector2(-1,-1)
+        self.cached_scaled = -1
 
-    #world bound
-    start_col = max(0,start_col)
-    end_col = min(size, end_col)
-    start_row = max(0, start_row)
-    end_row = min(size, end_row)
+    def generate_background_texture(self, size):
+        x_offset = random.uniform(0,10000)
+        y_offset = random.uniform(0,10000)
+        # print("drawing background")
+        self.maparr = np.zeros((size,size), dtype=float)
+        for i in range(len(self.maparr)):
+            for j in range(len(self.maparr[i])):
+                pno = pnoise2((i+x_offset)*B_NOISE_SCALE/size, (j+y_offset)*B_NOISE_SCALE/size, B_NOISE_OCTAVE)
+                pno = (pno+1)/2
+                self.maparr[i][j] = pno
 
-    # print(start_col, end_col, start_row, end_row)
+    def get_title_color(self, pno):
+        # converts perlin noise col to pno
+        c = round(255 * (pno**1.1))
+        fav = round(255 * (pno**0.5))
 
-    # print(math.ceil(WINDOW_HEIGHT/scaled))
+        if c/255 >= B_WATER_THRESH:
+            col = (220-c, 200-(c/2), fav)
+        elif B_SAND_THRESH < c/255 < B_WATER_THRESH:
+            col = (fav, fav, c)
+        else:
+            col = (c,fav+15,c-10)
 
-    for i in range(start_col,end_col):
-        for j in range(start_row, end_row):
-            # print(i,j)
-            # print(math.ceil(WINDOW_HEIGHT/scaled))
-            pno = maparr[i][j]
-            c = round(255 * (pno**1.1))
-            fav = round(255 * (pno**0.5))
+        return(col)
 
+    def update_background(self, size, camera_offset, scaled_value):
+        # print(self.maparr)
+        # cache check
+        if (camera_offset != self.cached_camera_offset or scaled_value != self.cached_scaled):
+            self.actually_update_background(self.cached_bg, size, camera_offset, scaled_value)
+            self.cached_camera_offset = camera_offset
+            self.cached_scaled = scaled_value
 
-            if c/255 >= B_WATER_THRESH:
-                col = (255-c, 255-c, fav)
-            elif B_SAND_THRESH < c/255 < B_WATER_THRESH:
-                col = (fav, fav, c)
-            else:
-                col = (c,fav,c)
-            
+        return self.cached_bg
 
-            s = B_BORDER
-            border = (int(col[0]*s),int(col[1]*s), int(col[2]*s) )
+    def actually_update_background(self, target_surface, size, camera_offset, scaled):
+        target_surface.fill(BACKGROUND_FILL)
 
-            pos = pygame.Vector2(i, j)
-            mouse = pygame.math.Vector2(pygame.mouse.get_pos())
-            # print(camera_offset)
-            pos_scaled = gridpos2screen(pos)
-            
-            # print(pos_scaled, mouse)
-            
-            # print(camera_offset)
+        start_col = math.floor(camera_offset.x / scaled)
+        end_col = math.ceil((WINDOW_WIDTH + camera_offset.x) / scaled)
+        start_row = math.floor((camera_offset.y) / scaled)
+        end_row = math.ceil((camera_offset.y + WINDOW_HEIGHT) / scaled)
 
-            # print(scaled_x, scaled_y)
+        #world bound
+        start_col = max(0,start_col)
+        end_col = min(size, end_col)
+        start_row = max(0, start_row)
+        end_row = min(size, end_row)
 
-            # pygame.draw.rect(background_surface, col, (500, 500, 50, 50))
-            pygame.draw.rect(background_surface, col, (pos_scaled.x, pos_scaled.y, scaled, scaled))
+        # print(start_col, end_col, start_row, end_row)
 
-            if scaled > 8:
-                pygame.draw.rect(background_surface, border, (pos_scaled.x, pos_scaled.y, scaled, scaled), 1)
+        # print(math.ceil(WINDOW_HEIGHT/scaled))
+
+        for i in range(start_col,end_col):
+            for j in range(start_row, end_row):
+                # print(i,j)
+                # print(math.ceil(WINDOW_HEIGHT/scaled))
+                pno = self.maparr[i][j]
+               
+                col = self.get_title_color(pno)
+
+                s = B_BORDER
+                border = (int(col[0]*s),int(col[1]*s), int(col[2]*s) )
+
+                pos = pygame.Vector2(i, j)
+                mouse = pygame.math.Vector2(pygame.mouse.get_pos())
+                # print(camera_offset)
+                pos_scaled = gridpos2screen(pos, camera_offset)
+                
+                # print(pos_scaled, mouse)
+                
+                # print(camera_offset)
+
+                # print(scaled_x, scaled_y)
+
+                # pygame.draw.rect(background_surface, col, (500, 500, 50, 50))
+                pygame.draw.rect(target_surface, col, (pos_scaled.x, pos_scaled.y, scaled, scaled))
+
+                if scaled > 8:
+                    pygame.draw.rect(target_surface, border, (pos_scaled.x, pos_scaled.y, scaled, scaled), 1)
 
 # 
 # CLASSES
@@ -223,10 +213,13 @@ class Simulation():
         self.flowers = []
         self.selected_bee = None
         self.selected_hive = None
+        self.camera_offset = pygame.Vector2(0,0)
 
         self.obstacles = []
 
         self.obstaclemap = np.zeros((MAP_SIZE+1, MAP_SIZE+1))
+
+        self.background = None
         
     def add(self,creature):
         self.creatures.append(creature)
@@ -261,6 +254,9 @@ class Simulation():
                     self.obstaclemap[pos_x, pos_y] = 1
         # print(self.obstaclemap)
 
+    def add_background(self, background):
+        self.background = background
+
     def run(self):
         for hive in self.hives[:]:
             hive.update(self)
@@ -274,9 +270,36 @@ class Simulation():
         # for creature in self.creatures[:]:
         #     creature.update(self)
         self.show_selected()
+        self.check_mouse_movement()
+
+    def check_mouse_movement(self):
+        mouse = pygame.math.Vector2(pygame.mouse.get_pos())
+
+        mouse_offset = pygame.Vector2(0,0)
+
+        # # set up camera borders
+        # left_border = self.camera_borders['left']
+        # top_border = self.camera_borders['top'] 
+        # right_border = self.display_surface.get_size()[0] - self.camera_borders['right']
+        # bottom_border = self.display_surface.get_size()[1] - self.camera_borders['bottom']
+
+        if mouse.y <= 0:
+            mouse_offset.y = -25
+        elif mouse.y >= WINDOW_HEIGHT - 1:
+            mouse_offset.y = 25
+        
+        if mouse.x == 0:
+            mouse_offset.x = -25
+        elif mouse.x >= WINDOW_WIDTH - 1:
+            mouse_offset.x = 25
+
+        self.camera_offset = self.camera_offset + mouse_offset
+
+        self.camera_offset.x = max(0, min(self.camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
+        self.camera_offset.y = max(0, min(self.camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
 
     
-    def handle_click(self, click_pos_screen):
+    def handle_click(self, click_pos_screen, camera_offset):
         clicked = False # by default it is not clicked
 
         click_vec = pygame.Vector2(click_pos_screen)
@@ -286,7 +309,7 @@ class Simulation():
         
         if not clicked: # if they clicked on hive
             for hive in reversed(self.hives):
-                screen_pos = gridpos2screen(hive.pos)
+                screen_pos = gridpos2screen(hive.pos, camera_offset)
                 diff = pygame.math.Vector2.magnitude(screen_pos-click_vec) # gets the distance from cursor and hive
                 if diff <= hive.size/2:
                     self.selected_hive = hive
@@ -295,12 +318,35 @@ class Simulation():
 
         if not clicked:
             for bee in reversed(self.creatures): # this is reversed so the last drawn (top most bee) is checked first in case a bee is on top of another bees
-                screen_pos = gridpos2screen(bee.pos)
+                screen_pos = gridpos2screen(bee.pos, camera_offset)
                 diff = pygame.math.Vector2.magnitude(screen_pos - click_vec)
                 if diff <= bee.radius:
-                    # print("omg clicked on bee")
                     self.selected_bee = bee
                     clicked = True # breaks out of the for loop
+
+    def add_objs(self, maparr):
+        invalid_coords = []
+
+        for i in range(2):
+            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+            while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
+                random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+            sim.add_hive(Hive(random_coord.x,random_coord.y, sim))
+            invalid_coords.append(random_coord)
+
+        for i in range(25):
+            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+            while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
+                random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+            sim.add_flo(Flower(random_coord.x, random_coord.y))
+            invalid_coords.append(random_coord)
+
+        for i in range(N_OBSTACLES):
+            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+            while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
+                random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
+            sim.add_obstacles(Obstacle(random_coord.x, random_coord.y))
+            invalid_coords.append(random_coord)
 
 
 
@@ -353,13 +399,7 @@ class Simulation():
             
             bees_inside = self.selected_hive.bees_inside
 
-            # print(self.selected_hive.combs_honey)
-
-            # print(self.combs)
-
-
             ## drawing the comb
-                
             col = pygame.Color(0)
             i = 0 # counter
             for comb_center in self.selected_hive.combs:
@@ -368,12 +408,10 @@ class Simulation():
                     col.hsla =((20+40*honey/100, 100, 50*honey/100+15, 100))
                     h_pos = hivepos2screen(pygame.Vector2(comb_center))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
-
                 i+=1
 
             for bee in self.selected_hive.bees_inside:
                 bee.draw_inside_hive()
-
 
 
 
@@ -390,14 +428,14 @@ class Flower():
     
     def update(self, manager):
         # self.angle += self.rotspeed
-        self.draw()
+        self.draw(manager.camera_offset)
 
         if self.pollen <= 0:
             manager.rem_flo(self)
             print("I BLEW UP!!!")
 
-    def draw(self):
-        screen_pos = gridpos2screen(self.pos)
+    def draw(self, camera_offset):
+        screen_pos = gridpos2screen(self.pos, camera_offset)
 
         # petalCount = 6 # temp petalcount
         #
@@ -427,7 +465,7 @@ class Obstacle():
         self.max_y = self.pos.y + self.size
 
     def update(self, manager):
-        self.draw()
+        self.draw(manager.camera_offset)
 
     def get_closest_point(self, obj_pos):
         closest_point = pygame.Vector2(0,0)
@@ -437,8 +475,8 @@ class Obstacle():
 
         return(closest_point)
         
-    def draw(self):
-        screen_pos = gridpos2screen(self.pos)
+    def draw(self, camera_offset):
+        screen_pos = gridpos2screen(self.pos, camera_offset)
         
         pygame.draw.rect(screen, (80, 80, 80), (screen_pos.x, screen_pos.y, scaled*self.size, scaled*self.size))
 
@@ -526,10 +564,10 @@ class Hive():
         elif self.internal_cooldown > 0 :
             self.internal_cooldown -= 1
 
-        self.draw()
+        self.draw(manager.camera_offset)
 
-    def draw(self):
-        screen_pos = gridpos2screen(self.pos)
+    def draw(self, camera_offset):
+        screen_pos = gridpos2screen(self.pos, camera_offset)
 
         # draws the hive where its center is its coordinate self.pos (x,y)
         pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x-self.size/2, screen_pos.y-self.size/2, self.size, self.size))
@@ -591,7 +629,7 @@ class Creature():
             steering += self.avoidrock(self.pos, manager)
             
             self.seekFlowers(manager.flowers)
-            steering += self.avoidwater(maparr) * 0.8
+            steering += self.avoidwater(manager.background.maparr) * 0.8
         elif not is_outside: # inside considered
             steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
 
@@ -651,7 +689,7 @@ class Creature():
 
         self.radius = (self.size_scaled+2)
 
-        self.screen_pos = gridpos2screen(self.pos)
+        self.screen_pos = gridpos2screen(self.pos, manager.camera_offset)
         # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
 
         if is_outside:
@@ -745,6 +783,7 @@ class Creature():
     def avoidwater(self, maparr):
         force = pygame.Vector2(0,0)
 
+        # print(maparr)
         if self.speed == 0 or maparr.all == None:
             return force
         
@@ -925,87 +964,62 @@ class Creature():
 
 
 
-
 sim = Simulation()
-
-def add_objs():
-    invalid_coords = []
-
-    for i in range(2):
-        random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
-            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        sim.add_hive(Hive(random_coord.x,random_coord.y, sim))
-        invalid_coords.append(random_coord)
-
-
-    for i in range(25):
-        random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
-            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        sim.add_flo(Flower(random_coord.x, random_coord.y))
-        invalid_coords.append(random_coord)
-
-    for i in range(N_OBSTACLES):
-        random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
-            random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-        sim.add_obstacles(Obstacle(random_coord.x, random_coord.y))
-        invalid_coords.append(random_coord)
-
 frames = 0
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 clock = pygame.time.Clock()
 pygame.event.set_grab(True)
 
-camera_offset = pygame.Vector2(0,0)
 mouse = pygame.Vector2(0,0)
+
 
 background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
 background_surface.fill(BACKGROUND_FILL)
 screen.fill("white")
 
+background = Environment(MAP_SIZE, sim)
+sim.add_background(background)
+
+sim.add_objs(background.maparr)
+
 def main():
     global scaled
-    draw_background(MAP_SIZE)
-    add_objs()
     running = True
     while running:
-        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running=False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    sim.handle_click(event.pos)
+                    sim.handle_click(event.pos, sim.camera_offset)
             if event.type == pygame.KEYDOWN:
                 global WORLD_SIZE
                 if event.key == pygame.K_EQUALS:
                     # print("awesome")
                     WORLD_SIZE = min(WORLD_SIZE * 2, 16384)
                     scaled = WORLD_SIZE/MAP_SIZE
+                    background.cached_scaled = -1
                 if event.key == pygame.K_MINUS:
                     WORLD_SIZE = max(512, WORLD_SIZE / 2)
                     scaled = WORLD_SIZE/MAP_SIZE
+                    background.cached_scaled = -1
         
         global frames
         frames += 1
 
-        camera_offset.x = max(0, min(camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
-        camera_offset.y = max(0, min(camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
-
-        
-        background_surface.fill(BACKGROUND_FILL)
-        check_mouse_movement()
-        update_background(MAP_SIZE)
-
-        test_area = pygame.Rect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
         screen.fill(BACKGROUND_FILL)
-        screen.blit(background_surface, (0,0), area=test_area)
+        
+        current_background_view = background.update_background(MAP_SIZE, sim.camera_offset, scaled)
+
+        screen.blit(current_background_view, (0,0))
+        # background_surface.fill(BACKGROUND_FILL)
+        # background.update_background(MAP_SIZE, sim.camera_offset)
+
+        # test_area = pygame.Rect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
+        # screen.blit(background_surface, (0,0), area=test_area)
         # pygame.draw.circle(screen, "black", (30, 30), 500)
 
         sim.run()
-
 
         pygame.display.flip()
         clock.tick(FPS)
