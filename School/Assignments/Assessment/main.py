@@ -5,6 +5,8 @@ import random # ensure randomised simulation on every run
 import math # additiona math functions
 import sys # for logging, debuggin
 from noise import pnoise2 # map generation
+import argparse # parsing arguments
+
 
 # General Constants
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720 # sets up a 1280x720 display window
@@ -29,7 +31,7 @@ CA_BORDER_MARGIN = 5
 
 # Creature
 CR_INITIAL_ENERGY = 100 # initial energy of a new creature (might change this into a output? who knows)
-CR_ENERGY_DECAY = 1 # ts is energy lost per second
+CR_ENERGY_DECAY = 0 # ts is energy lost per second
 
 # Bg
 B_NOISE_OCTAVE = 8 # noise octave for perlin noise gen
@@ -380,6 +382,7 @@ class Simulation():
                 "Closest Flower Position": bee.closestflower.pos,
                 "Colour": bee.colour,
                 "Honey": bee.honey,
+                "Total Honey Aquired": bee.total_honey,
             }
             
             offset = 20
@@ -428,6 +431,8 @@ class Flower():
         self.petalCol = (random.randint(100,255), 255, random.randint(100,255)) # ts does not do anything
         self.pollen = 100000
 
+        self.n_bees = 0
+
         self.angle = 0 # initial angle
         self.rotspeed = 0.005 # rotational speed
     
@@ -456,6 +461,7 @@ class Flower():
         #     pygame.draw.ellipse(screen, self.petalCol, (draw_pos.x, draw_pos.y, 0.5*scaled, 1.2*scaled))
         #
         pygame.draw.circle(screen, self.petalCol, (screen_pos), scaled)
+        draw_text(screen, f"{self.n_bees}", STATS_FONT, TEXT_COLOUR, (screen_pos))
 
 class Node():
     def __init__(self, parent=None, position=None):
@@ -595,6 +601,8 @@ class Creature():
         self.energy = CR_INITIAL_ENERGY
 
         self.honey = 0
+
+        self.total_honey = 0
 
         self.angle = 0
 
@@ -854,15 +862,19 @@ class Creature():
 
         for flower in flowers:
             if not self.closestflower:
-                self.closestflower = flower
-            if distance(flower.pos, self.pos) < distance(self.pos, self.closestflower.pos) or self.closestflower not in flowers:
+                self.closestflower = flower # sets the flower if it does not exist
+                self.closestflower.n_bees += 1
+            if distance(flower.pos, self.pos) < distance(self.pos, self.closestflower.pos) and flower.n_bees <= 10:
                 # print(distance(flower.pos,self.pos))
+                self.closestflower.n_bees -= 1
                 self.closestflower = flower
+                self.closestflower.n_bees += 1
                 # print("CLOSEST FLOWER DETECTED!!", flower.pos)
         if self.seeking_honey == True:
             self.goFlower()
             if distance(self.pos, self.closestflower.pos) <= B_DETECT/4:
                 self.honey += 0.5
+                self.total_honey += 0.5
                 self.closestflower.pollen -= 0.5
         elif self.seeking_honey == False: # If it is no longer seeking honey.
             self.goHive()
@@ -1124,6 +1136,19 @@ sim.add_background(background)
 sim.add_objs(background.maparr)
 
 def main():
+    parser = argparse.ArgumentParser(description="Simulate Bees")
+
+    parser.add_argument('-i', '--interactive', action='store_true', help='interactive mode')
+
+    args = parser.parse_args()
+
+    if args.interactive:
+        try:
+            print("::::::::::::::::::::::INPUTS::[Interactive Mode]::::::::::::::::::::::")
+        except:
+            print("poopfart")
+
+
     global scaled
     running = True
     while running:
