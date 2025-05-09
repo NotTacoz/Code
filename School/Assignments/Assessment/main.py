@@ -631,13 +631,21 @@ class Creature():
     def update(self, manager):
         self.avoidedge(self.pos)
         # print("my current pos is: ", self.pos)
-        if frames == 1:
-            # get a non water pos
-            random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
-            while manager.background.maparr[int(random_pos.x), int(random_pos.y)] >= B_WATER_THRESH:
-                random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
-                
-            self.a_star_pathfind(manager.background.maparr, self.hive.pos, random_pos)
+
+        """This (below) is unsed a_star_pathfind code. It doesnt effect physics or the simulation at all and purely visual. 
+        It looks nice (and interesting!), but I have found little reason to use it on top of the bee's already complex behaviour. 
+        This pathfinding *could* circumvent a very rare issue (that is the bee getting stuck between two rocks), 
+        but since the map is too big and there is too little obstacles, i have decided not to use it.
+
+        Moreover, it isnt really true to real life animal behaviour - animals rarely calculate the most "optimal" direction when heading towards an object, 
+        as animals are incapable of storing the position of their target object and every obstacle in their path."""
+        # if frames == 1:
+        #     # get a non water pos
+        #     random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
+        #     while manager.background.maparr[int(random_pos.x), int(random_pos.y)] >= B_WATER_THRESH:
+        #         random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
+        #
+        #     self.a_star_pathfind(manager, self.hive.pos, random_pos)
         
         self.whatamidoing()
         is_outside = self in self.hive.bees_outside
@@ -729,7 +737,7 @@ class Creature():
         if self.honey >= self.min_honey:
             self.seeking_honey = False
 
-    def a_star_pathfind(self, maparr, in_pos, target_pos):
+    def a_star_pathfind(self, manager, in_pos, target_pos):
         """note about this implementation:
         1. only works on grid (in this case MAP_SIZExMAP_SIZE which is 128x)
         2. i am schizophrenic so this might not wor
@@ -769,7 +777,7 @@ class Creature():
                     curr = curr.parent
 
                 for path_block in path:
-                    maparr[int(path_block.x), int(path_block.y)] = 50/255
+                    manager.background.map_col[int(path_block.x), int(path_block.y)] = self.colour
 
 
                 # print(path[::-1]) # return path but reversed
@@ -789,7 +797,10 @@ class Creature():
                     if not (0 <= node_pos.x < MAP_SIZE and 0 <= node_pos.y < MAP_SIZE):
                         continue
 
-                    if maparr[int(node_pos.x), int(node_pos.y)] >= B_WATER_THRESH:
+                    if manager.background.maparr[int(node_pos.x), int(node_pos.y)] >= B_WATER_THRESH:
+                        continue
+
+                    if manager.obstaclemap[int(node_pos.x), int(node_pos.y)] == 1:
                         continue
 
                     child_node = Node(current_node, node_pos)
@@ -806,7 +817,7 @@ class Creature():
                 if in_closed == True:
                     continue
 
-                child_node.g  = current_node.g + 1
+                child_node.g  = current_node.g + distance(current_node.position, child_node.position)
                 child_node.h = distance(child_node.position, end_node.position)
                 child_node.f = child_node.g + child_node.h
 
