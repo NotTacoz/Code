@@ -30,7 +30,7 @@ CA_BORDER_MARGIN = 5
 
 # Creature
 CR_INITIAL_ENERGY = 100 # initial energy of a new creature (might change this into a output? who knows)
-CR_ENERGY_DECAY = 0.1 # ts is energy lost per second
+CR_ENERGY_DECAY = 0 # ts is energy lost per second
 
 # Bg
 B_NOISE_OCTAVE = 8 # noise octave for perlin noise gen
@@ -47,7 +47,7 @@ B_MAX_V = 0.1 # max velocit
 B_MIN_V = 0.02
 
 # hive constant
-H_INITIAL_WORKERS = 50
+H_INITIAL_WORKERS = 20
 H_INITIAL_QUEENS = 1
 H_BEE_COOLDOWN = 3 # number of frames before a bee can exit/enter
 COMB_WIDTH, COMB_HEIGHT = 12, 9 # comb size in hive
@@ -540,7 +540,21 @@ class Hive():
 
         for i in range(self.workerspop):
             offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
-            temp_bee = Creature(x,y, self, manager)
+            temp_bee = Creature(x,y, self, manager, "worker")
+
+            sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
+            self.bees_inside.append(temp_bee)
+
+        for i in range(self.queenpop):
+            offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
+            temp_bee = Creature(x,y, self, manager, "queen")
+
+            sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
+            self.bees_inside.append(temp_bee)
+
+        for i in range(self.queenpop):
+            offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
+            temp_bee = Creature(x,y, self, manager, "drone")
 
             sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
             self.bees_inside.append(temp_bee)
@@ -612,7 +626,9 @@ class Hive():
         pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x-self.size/2, screen_pos.y-self.size/2, self.size, self.size))
 
 class Creature():
-    def __init__(self, x, y, hive, manager):
+    def __init__(self, x, y, hive, manager, role):
+        self.role = role
+
         self.pos = pygame.Vector2(x, y) #change pos later 
         
         self.energy = manager.initial_bee_energy
@@ -651,6 +667,8 @@ class Creature():
 
         self.selectedframe = random.randint(0, 5) # this is used to give the bee a random frame of the 5 frames, to ensure that the bee has a different, more random cycle. 
 
+        self.image_file = pygame.image.load('bee.png')
+
         # im not entirely sure if this actually does anything
 
     def update(self, manager):
@@ -671,40 +689,34 @@ class Creature():
         #         random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
         #
         #     self.a_star_pathfind(manager, self.hive.pos, random_pos)
-        
-        self.whatamidoing()
+        is_worker = self.role == "worker" 
         is_outside = self in self.hive.bees_outside
-
         steering = pygame.Vector2(0,0)
 
-        if is_outside:
-            # calculate forces every 5 frames
-            if frames % 5 == self.selectedframe:
-                steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
+        if is_worker:
+            self.whatamidoing()
 
-            steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE) * 100
-            steering += self.avoidrock(self.pos, manager)
-            
-            self.seekFlowers(manager.flowers)
-            steering += self.avoidwater(manager.background.maparr) * 0.8
-        elif not is_outside: # inside considered
-            steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
+            if is_outside:
+                # calculate forces every 5 frames
+                if frames % 5 == self.selectedframe:
+                    steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
 
-            if self in self.hive.bees_inside:
-                self.avoidedge(self.hive_pos)
-             
-                steering += self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
+                steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE) * 100
+                steering += self.avoidrock(self.pos, manager)
+                
+                self.seekFlowers(manager.flowers)
+                steering += self.avoidwater(manager.background.maparr) * 0.8
+            elif not is_outside: # inside considered
+                steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
 
-                if self.seeking_honey == False:
-                    self.dohoneythings() # function to fill up the honey
+                if self in self.hive.bees_inside:
+                    self.avoidedge(self.hive_pos)
+                 
+                    steering += self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
 
+                    if self.seeking_honey == False:
+                        self.dohoneythings() # function to fill up the honey
 
-        # self.applyForce(self.avoidrock(self.pos, manager)) # avoids obstacles EVERY frame
-
-        # self.calculateForces(self.hive.bees_outside, self.pos) # calculates all the forces to do/adds
-
-
-        # seeking flower code
 
 
         self.applyForce(steering)
@@ -737,7 +749,10 @@ class Creature():
 
         if self.energy <= 0:
             print("creature ran out of energy :(")
-            self.hive.bees_outside.remove(self)
+            if is_outside:
+                self.hive.bees_outside.remove(self)
+            else:
+                self.hive.bees_inside.remove(self)
             manager.remove(self)
 
         self.size_raw = self.energy/500
@@ -1082,9 +1097,11 @@ class Creature():
     def draw(self, scaled):
         ## actually drawing the creatures
         # print(camera_offset)
-        pygame.draw.circle(screen, self.colour, self.screen_pos, (self.size_scaled+2)) 
+        # if scaled > 8:
+        #     screen.blit(self.image_file, self.screen_pos)
+        pygame.draw.circle(screen, self.colour, self.screen_pos, (self.size_scaled+3)) 
         if self.selected == True:
-            pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, (self.size_scaled+3), 2) 
+            pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, (self.size_scaled+4), 2) 
             pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, self.size_scaled+B_DETECT*scaled, 2) # Drawing Detect Radius
             # pygame.draw.circle(screen, CR_HOVER_COLOUR, self.screen_pos, self.size_scaled+B_DETECT*3*scaled, 2)
             pygame.draw.circle(screen, (255,0,0), self.screen_pos, self.size_scaled+B_SEP_THRESHOLD*scaled, 2) # Drawing avoid radius
