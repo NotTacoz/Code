@@ -1,17 +1,17 @@
 # Imports
-import pygame # pygame is the primary library used for the simulation engine
-import numpy as np # this is for np's useful array features and maths
-import random # ensure randomised simulation on every run
-import math # additiona math functions
-import sys # for logging, debuggin
-from noise import pnoise2 # map generation
-import argparse # parsing arguments
+import pygame  # pygame is the primary library used for the simulation engine
+import numpy as np  # this is for np's useful array features and maths
+import random  # ensure randomised simulation on every run
+import math  # additiona math functions
+import sys  # for logging, debuggin
+from noise import pnoise2  # map generation
+import argparse  # parsing arguments
 
 
 # General Constants
-WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720 # sets up a 1280x720 display window
-MAP_SIZE = 128 # how many pixels (blocks) the map will take up
-FPS=60 # frames per second
+WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720  # sets up a 1280x720 display window
+MAP_SIZE = 128  # how many pixels (blocks) the map will take up
+FPS=60  # frames per second
 TEXT_COLOUR = (255 ,255, 255)
 
 ## New and Improved Updated Constants
@@ -30,7 +30,7 @@ CA_BORDER_MARGIN = 5
 
 # Creature
 CR_INITIAL_ENERGY = 100 # initial energy of a new creature (might change this into a output? who knows)
-CR_ENERGY_DECAY = 0 # ts is energy lost per second
+CR_ENERGY_DECAY = 0.1 # ts is energy lost per second
 
 # Bg
 B_NOISE_OCTAVE = 8 # noise octave for perlin noise gen
@@ -182,8 +182,7 @@ class Environment():
             for j in range(start_row, end_row):
                 # print(i,j)
                 # print(math.ceil(WINDOW_HEIGHT/scaled))
-                pno = self.maparr[i][j]
-               
+                # pno = self.maparr[i][j]
                 col = self.map_col[i][j]
 
                 s = B_BORDER
@@ -216,6 +215,11 @@ class Simulation():
         self.scaled = initial_world_size/MAP_SIZE
         self.frames = 0
 
+        self.number_of_bees = H_INITIAL_WORKERS
+        self.initial_bee_energy = CR_INITIAL_ENERGY
+        self.hive_release_cooldown = H_BEE_COOLDOWN
+        self.number_obstacles = N_OBSTACLES
+
         self.creatures = []
         self.hives = []
         self.flowers = []
@@ -228,6 +232,12 @@ class Simulation():
         self.obstaclemap = np.zeros((MAP_SIZE+1, MAP_SIZE+1))
 
         self.background = None
+
+    def update_values(self, number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles):
+        self.number_of_bees = number_of_bees
+        self.initial_bee_energy = initial_bee_energy
+        self.hive_release_cooldown = hive_release_cooldown
+        self.number_obstacles = number_obstacles
         
     def add(self,creature):
         self.creatures.append(creature)
@@ -354,7 +364,7 @@ class Simulation():
             sim.add_flo(Flower(random_coord.x, random_coord.y))
             invalid_coords.append(random_coord)
 
-        for i in range(N_OBSTACLES):
+        for i in range(self.number_obstacles):
             random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
             while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
                 random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
@@ -514,7 +524,7 @@ class Hive():
     def __init__(self,x,y, sim, manager):
         self.pos=pygame.Vector2(x,y)
 
-        self.workerspop = H_INITIAL_WORKERS
+        self.workerspop = manager.number_of_bees
         self.numbeesinside = self.workerspop
         self.queenpop = H_INITIAL_QUEENS
         self.bees_inside = []
@@ -589,7 +599,7 @@ class Hive():
                 self.bees_outside.append(bee)
             else:
                 self.beelook += 1
-            self.internal_cooldown = H_BEE_COOLDOWN
+            self.internal_cooldown = manager.hive_release_cooldown
         elif self.internal_cooldown > 0 :
             self.internal_cooldown -= 1
 
@@ -605,7 +615,7 @@ class Creature():
     def __init__(self, x, y, hive, manager):
         self.pos = pygame.Vector2(x, y) #change pos later 
         
-        self.energy = CR_INITIAL_ENERGY
+        self.energy = manager.initial_bee_energy
 
         self.honey = 0
 
@@ -1090,11 +1100,12 @@ class Creature():
 
     def dohoneythings(self):
         # 1. search for all combs inside hive to find first comb with not max honey
-        i =0
+        i = 0
         j = 0 # counter
+
         # check honey status
         if self.honey <= 0:
-            print("im removing myself")
+            print("im removing myself (from hive)")
             self.seeking_honey = True
             self.hive.bees_outside.append(self)
             self.hive.bees_inside.remove(self)
@@ -1122,7 +1133,25 @@ class Creature():
 
 
 
+parser = argparse.ArgumentParser(description="Simulate Bees")
+
+parser.add_argument('-i', '--interactive', action='store_true', help='interactive mode')
+
+args = parser.parse_args()
+
 sim = Simulation()
+
+if args.interactive:
+    try:
+        print("::::::::::::::::::::::INPUTS::[Interactive Mode]::::::::::::::::::::::")
+        number_of_bees = int(x) if (x := input(f"Number of bees per hive (default={H_INITIAL_WORKERS}): ")) else H_INITIAL_WORKERS
+        initial_bee_energy = int(x) if (x := input(f"Bee Initial Energy (default={CR_INITIAL_ENERGY}): ")) else CR_INITIAL_ENERGY
+        hive_release_cooldown = int(x) if (x := input(f"Hive Bee Release Cooldown (default={H_BEE_COOLDOWN} frames): ")) else CR_INITIAL_ENERGY
+        number_obstacles = int(x) if (x := input(f"Number of obstacles (default={N_OBSTACLES}): ")) else N_OBSTACLES
+        sim.update_values(number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles)
+        print("::::::::::::::::::::::[End Interactive Mode]::::::::::::::::::::::")
+    except:
+        print("Input Error: Check your inputs and try again")
 frames = 0
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 clock = pygame.time.Clock()
@@ -1140,17 +1169,7 @@ sim.add_background(background)
 sim.add_objs(background.maparr)
 
 def main():
-    parser = argparse.ArgumentParser(description="Simulate Bees")
 
-    parser.add_argument('-i', '--interactive', action='store_true', help='interactive mode')
-
-    args = parser.parse_args()
-
-    if args.interactive:
-        try:
-            print("::::::::::::::::::::::INPUTS::[Interactive Mode]::::::::::::::::::::::")
-        except:
-            print("Input Error: Check your inputs and try again")
 
     running = True
     while running:
