@@ -10,7 +10,6 @@ import argparse # parsing arguments
 
 # General Constants
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720 # sets up a 1280x720 display window
-WORLD_SIZE = 4096 # world size
 MAP_SIZE = 128 # how many pixels (blocks) the map will take up
 FPS=60 # frames per second
 TEXT_COLOUR = (255 ,255, 255)
@@ -57,7 +56,6 @@ COMB_WIDTH, COMB_HEIGHT = 12, 9 # comb size in hive
 F_SIZE = 8 # unscaled
 
 ## INITIALISATION !!!
-scaled = WORLD_SIZE/MAP_SIZE
 pygame.init()
 pygame.font.init()
 STATS_FONT = pygame.font.SysFont("Arial", 16)
@@ -81,10 +79,10 @@ def is_hovered(screen_width, screen_height, screen_pos):
 def gridpos2screen(x, camera_offset):
     """converts grid coords to screen coords"""
     # print(MAP_SIZE) # should be 128x128 by default
-    return (x * scaled - camera_offset)
+    return (x * sim.scaled - camera_offset)
     
 def screenpos2grid(x, camera_offset):
-    return ((x+camera_offset)/scaled)
+    return ((x+camera_offset)/sim.scaled)
 
 def hivepos2screen(x):
     # this is kinda stupid but i made hive 400x400 and not changeable but because im too lazy. maybe ill change it later
@@ -116,7 +114,7 @@ class Environment():
         # print(np.mean(test))
         # pygame.draw.circle(screen, "black", (30, 30), 500)
 
-        self.map_world_surface = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
+        self.map_world_surface = pygame.Surface((size, size))
         self.generate_background_texture(size)
 
         self.cached_bg = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -213,7 +211,11 @@ class Environment():
 #
 
 class Simulation():
-    def __init__(self):
+    def __init__(self, initial_world_size=4096):
+        #prev global variables
+        self.scaled = initial_world_size/MAP_SIZE
+        self.frames = 0
+
         self.creatures = []
         self.hives = []
         self.flowers = []
@@ -264,6 +266,9 @@ class Simulation():
         self.background = background
 
     def run(self):
+        # increment curr frame by 1
+        self.frames += 1
+
         for hive in self.hives[:]:
             hive.update(self)
         for bee in self.creatures[:]:
@@ -301,8 +306,10 @@ class Simulation():
 
         self.camera_offset = self.camera_offset + mouse_offset
 
-        self.camera_offset.x = max(0, min(self.camera_offset.x, WORLD_SIZE - WINDOW_WIDTH))
-        self.camera_offset.y = max(0, min(self.camera_offset.y, WORLD_SIZE - WINDOW_HEIGHT))
+        # if scaled = world_size/map_size, world_size = scaled*map_size
+
+        self.camera_offset.x = max(0, min(self.camera_offset.x, self.scaled * MAP_SIZE - WINDOW_WIDTH))
+        self.camera_offset.y = max(0, min(self.camera_offset.y, self.scaled * MAP_SIZE - WINDOW_HEIGHT))
 
     
     def handle_click(self, click_pos_screen, camera_offset):
@@ -337,7 +344,7 @@ class Simulation():
             random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
             while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
                 random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
-            sim.add_hive(Hive(random_coord.x,random_coord.y, sim))
+            sim.add_hive(Hive(random_coord.x,random_coord.y, sim, self))
             invalid_coords.append(random_coord)
 
         for i in range(25):
@@ -438,13 +445,13 @@ class Flower():
     
     def update(self, manager):
         # self.angle += self.rotspeed
-        self.draw(manager.camera_offset)
+        self.draw(manager.camera_offset, manager.scaled)
 
         if self.pollen <= 0:
             manager.rem_flo(self)
             print("I BLEW UP!!!")
 
-    def draw(self, camera_offset):
+    def draw(self, camera_offset, scaled):
         screen_pos = gridpos2screen(self.pos, camera_offset)
 
         # petalCount = 6 # temp petalcount
@@ -487,7 +494,7 @@ class Obstacle():
         self.max_y = self.pos.y + self.size
 
     def update(self, manager):
-        self.draw(manager.camera_offset)
+        self.draw(manager.camera_offset, manager.scaled)
 
     def get_closest_point(self, obj_pos):
         closest_point = pygame.Vector2(0,0)
@@ -497,14 +504,14 @@ class Obstacle():
 
         return(closest_point)
         
-    def draw(self, camera_offset):
+    def draw(self, camera_offset, scaled):
         screen_pos = gridpos2screen(self.pos, camera_offset)
         
         pygame.draw.rect(screen, (80, 80, 80), (screen_pos.x, screen_pos.y, scaled*self.size, scaled*self.size))
 
 
 class Hive():
-    def __init__(self,x,y, sim):
+    def __init__(self,x,y, sim, manager):
         self.pos=pygame.Vector2(x,y)
 
         self.workerspop = H_INITIAL_WORKERS
@@ -523,7 +530,7 @@ class Hive():
 
         for i in range(self.workerspop):
             offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
-            temp_bee = Creature(x,y, self)
+            temp_bee = Creature(x,y, self, manager)
 
             sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
             self.bees_inside.append(temp_bee)
@@ -570,7 +577,7 @@ class Hive():
         if self.beelook >= len(self.bees_inside): # resets beelook (the poninter in array) if its past the length of arr
             self.beelook = 0
 
-        self.size = scaled*4
+        self.size = manager.scaled*4
         if self.internal_cooldown == 0 and len(self.bees_inside) > 0:
             # bee to look at variable
 
@@ -595,7 +602,7 @@ class Hive():
         pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x-self.size/2, screen_pos.y-self.size/2, self.size, self.size))
 
 class Creature():
-    def __init__(self, x, y, hive):
+    def __init__(self, x, y, hive, manager):
         self.pos = pygame.Vector2(x, y) #change pos later 
         
         self.energy = CR_INITIAL_ENERGY
@@ -628,7 +635,7 @@ class Creature():
 
         self.size_raw = self.energy/500
 
-        self.size_scaled = self.size_raw * scaled
+        self.size_scaled = self.size_raw * manager.scaled
 
         self.radius = (self.size_scaled+2)
 
@@ -725,7 +732,7 @@ class Creature():
 
         self.size_raw = self.energy/500
 
-        self.size_scaled = self.size_raw * scaled
+        self.size_scaled = self.size_raw * manager.scaled
 
         self.radius = (self.size_scaled+2)
 
@@ -733,7 +740,7 @@ class Creature():
         # despite its name real pos is actually the pos of the character on the monitor so real is all relative xdxd
 
         if is_outside:
-            self.draw()
+            self.draw(manager.scaled)
 
     def applyForce(self, force):
         # print(force)
@@ -849,8 +856,6 @@ class Creature():
         return []
                         
         
-
-
 
 
 
@@ -1064,7 +1069,7 @@ class Creature():
             return(dir)
         return (com)
         
-    def draw(self):
+    def draw(self, scaled):
         ## actually drawing the creatures
         # print(camera_offset)
         pygame.draw.circle(screen, self.colour, self.screen_pos, (self.size_scaled+2)) 
@@ -1125,7 +1130,6 @@ pygame.event.set_grab(True)
 
 mouse = pygame.Vector2(0,0)
 
-
 background_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
 background_surface.fill(BACKGROUND_FILL)
 screen.fill("white")
@@ -1146,10 +1150,8 @@ def main():
         try:
             print("::::::::::::::::::::::INPUTS::[Interactive Mode]::::::::::::::::::::::")
         except:
-            print("poopfart")
+            print("Input Error: Check your inputs and try again")
 
-
-    global scaled
     running = True
     while running:
         for event in pygame.event.get():
@@ -1159,23 +1161,19 @@ def main():
                 if event.button == 1:
                     sim.handle_click(event.pos, sim.camera_offset)
             if event.type == pygame.KEYDOWN:
-                global WORLD_SIZE
                 if event.key == pygame.K_EQUALS:
                     # print("awesome")
-                    WORLD_SIZE = min(WORLD_SIZE * 2, 16384)
-                    scaled = WORLD_SIZE/MAP_SIZE
+                    temp_world_size = min(sim.scaled*MAP_SIZE * 2, 16384)
+                    sim.scaled = temp_world_size/MAP_SIZE
                     background.cached_scaled = -1
                 if event.key == pygame.K_MINUS:
-                    WORLD_SIZE = max(512, WORLD_SIZE / 2)
-                    scaled = WORLD_SIZE/MAP_SIZE
+                    temp_world_size = max(512, sim.scaled*MAP_SIZE / 2)
+                    sim.scaled = temp_world_size/MAP_SIZE
                     background.cached_scaled = -1
         
-        global frames
-        frames += 1
-
         screen.fill(BACKGROUND_FILL)
         
-        current_background_view = background.update_background(MAP_SIZE, sim.camera_offset, scaled)
+        current_background_view = background.update_background(MAP_SIZE, sim.camera_offset, sim.scaled)
 
         screen.blit(current_background_view, (0,0))
         # background_surface.fill(BACKGROUND_FILL)
