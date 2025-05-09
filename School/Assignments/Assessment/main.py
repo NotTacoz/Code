@@ -121,18 +121,22 @@ class Environment():
         self.cached_camera_offset = pygame.Vector2(-1,-1)
         self.cached_scaled = -1
 
+
     def generate_background_texture(self, size):
         x_offset = random.uniform(0,10000)
         y_offset = random.uniform(0,10000)
         # print("drawing background")
         self.maparr = np.zeros((size,size), dtype=float)
+        self.map_col = np.empty((size, size), dtype=object)
+
         for i in range(len(self.maparr)):
             for j in range(len(self.maparr[i])):
                 pno = pnoise2((i+x_offset)*B_NOISE_SCALE/size, (j+y_offset)*B_NOISE_SCALE/size, B_NOISE_OCTAVE)
                 pno = (pno+1)/2
                 self.maparr[i][j] = pno
+                self.map_col[i][j] = self.get_tile_color(pno)
 
-    def get_title_color(self, pno):
+    def get_tile_color(self, pno):
         # converts perlin noise col to pno
         c = round(255 * (pno**1.1))
         fav = round(255 * (pno**0.5))
@@ -180,7 +184,7 @@ class Environment():
                 # print(math.ceil(WINDOW_HEIGHT/scaled))
                 pno = self.maparr[i][j]
                
-                col = self.get_title_color(pno)
+                col = self.map_col[i][j]
 
                 s = B_BORDER
                 border = (int(col[0]*s),int(col[1]*s), int(col[2]*s) )
@@ -405,6 +409,7 @@ class Simulation():
             for comb_center in self.selected_hive.combs:
                 honey = self.selected_hive.combs_honey[math.floor(i/COMB_WIDTH), i % COMB_WIDTH]
                 if honey >= 0: # does not draw invalid combs (-1)
+                    # print(honey)
                     col.hsla =((20+40*honey/100, 100, 50*honey/100+15, 100))
                     h_pos = hivepos2screen(pygame.Vector2(comb_center))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
@@ -740,9 +745,9 @@ class Creature():
         closed_list = [] # list of nodes that hasnt been searched
         open_list = [start_node] # the list of the nodes we have looked at
 
-        while len(open_list) > 0 and len(closed_list) < 500: # when the list of open nodes is empty, which is unexpected, so it should return failure
+        while len(open_list) > 0 and len(closed_list) < 100: # when the list of open nodes is empty, which is unexpected, so it should return failure
 
-            print(len(closed_list), len(open_list))
+            # print(len(closed_list), len(open_list))
 
             # getting the current node
             current_node = open_list[0] # for each current_node in the open current_node
@@ -767,7 +772,7 @@ class Creature():
                     maparr[int(path_block.x), int(path_block.y)] = 50/255
 
 
-                print(path[::-1]) # return path but reversed
+                # print(path[::-1]) # return path but reversed
                 return(path[::-1]) # return path but reversed
 
             # creating children
@@ -821,6 +826,7 @@ class Creature():
                 open_list.append(child_node)
 
         print("A* failed: we found no path :)")
+        print(len(closed_list), len(open_list))
         return []
                         
         
@@ -1074,7 +1080,7 @@ class Creature():
                     diff = comb_pos - self.hive_pos
                     if pygame.math.Vector2.magnitude(diff) <= 1 and self.honey >= 0:
                         self.honey -= 0.1
-                        self.hive.combs_honey[j, i%10] += 0.1
+                        self.hive.combs_honey[j, i%COMB_WIDTH] += 0.1
                 i+=1
             j+=1
         # 2. dif fpos from self
