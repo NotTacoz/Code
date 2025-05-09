@@ -627,7 +627,12 @@ class Creature():
         self.avoidedge(self.pos)
         # print("my current pos is: ", self.pos)
         if frames == 1:
-            self.a_star_pathfind(manager.background.maparr, pygame.Vector2(0,0), pygame.Vector2(50,50))
+            # get a non water pos
+            random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
+            while manager.background.maparr[int(random_pos.x), int(random_pos.y)] >= B_WATER_THRESH:
+                random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
+                
+            self.a_star_pathfind(manager.background.maparr, self.hive.pos, random_pos)
         
         self.whatamidoing()
         is_outside = self in self.hive.bees_outside
@@ -725,73 +730,99 @@ class Creature():
         2. i am schizophrenic so this might not wor
         3. this is based off random pseudocode i found in google images
         """
+        print("we want to go from", in_pos, "to", target_pos)
         start_node=Node(None, in_pos)
-        start_node.g = start_node.h + start_node.f 
+        start_node.g = 0 
+        start_node.h = distance(start_node.position, target_pos)
+        start_node.f = start_node.g + start_node.h
         end_node=Node(None, target_pos)
-        end_node.g = end_node.h + end_node.f
-        
 
         closed_list = [] # list of nodes that hasnt been searched
         open_list = [start_node] # the list of the nodes we have looked at
 
-        while len(open_list) > 0: # when the list of open nodes is empty, which is unexpected, so it should return failure
-            current_node = open_list[0] # for each current_node in the open current_node
+        while len(open_list) > 0 and len(closed_list) < 500: # when the list of open nodes is empty, which is unexpected, so it should return failure
 
             print(len(closed_list), len(open_list))
 
-            open_list.pop(0)
+            # getting the current node
+            current_node = open_list[0] # for each current_node in the open current_node
+            current_index = 0
+            for index, item in enumerate(open_list):
+                if item.f < current_node.f:
+                    current_node = item
+                    current_index = index
+
+            open_list.pop(current_index)
             closed_list.append(current_node)
 
             if current_node.position == target_pos: # if we have reached the destination
                 path = []
-                path.append(current_node)
-                
-                parent = current_node.parent
+                curr = current_node
 
-                while parent != None:
-                    path.append(current_node.position)
-                    parent = current_node.parent
+                while curr is not None:
+                    path.append(curr.position)
+                    curr = curr.parent
 
+                for path_block in path:
+                    maparr[int(path_block.x), int(path_block.y)] = 50/255
+
+
+                print(path[::-1]) # return path but reversed
                 return(path[::-1]) # return path but reversed
-            
 
             # creating children
             # gets 3x3 grid around center
+
+            children = []
             for i in range(-1,2): #i is x 
-                for j in range(-1,2): # j is y
-                    if (i != 0 and j != 0) and (0 < current_node.position.x + i < MAP_SIZE and 0 < current_node.position.y+j < MAP_SIZE): # if not the center, or is not valid
-                        child_node = Node(current_node, pygame.Vector2(current_node.position.x + i, current_node.position.y + j))
-                        # print(child_node.position)
+                for j in range(-1,2): # j is you
+                    if (i == 0 and j == 0): # if centered
+                        continue
 
-                        bruh = False
+                    node_pos = pygame.Vector2(current_node.position.x + i, current_node.position.y + j)
+                    
+                    if not (0 <= node_pos.x < MAP_SIZE and 0 <= node_pos.y < MAP_SIZE):
+                        continue
 
-                        for look_child in closed_list:
-                            if child_node.position == look_child.position:
-                                # print("breaking off the loop")
-                                bruh = True
+                    if maparr[int(node_pos.x), int(node_pos.y)] >= B_WATER_THRESH:
+                        continue
 
-                        # print(child_node.position)
-                        if maparr[int(child_node.position.x), int(child_node.position.y)] == B_WATER_THRESH:
-                            bruh = True
+                    child_node = Node(current_node, node_pos)
+                    children.append(child_node)
 
-                        if bruh == False:
-                            dontappend = False
 
-                            child_node.g  = current_node.g + 1
-                            child_node.h = distance(child_node.position, end_node.position)
-                            child_node.f = child_node.g + child_node.f
+            for child_node in children:
+                in_closed = False
 
-                            for open_node in open_list:
-                                if child_node.position == open_node.position and child_node.g > open_node.g:
-                                    dontappend = True
-                            
-                            if dontappend == False:
-                                open_list.append(child_node)
+                for look_child in closed_list:
+                    if child_node.position == look_child.position:
+                        in_closed = True
+                        break
+                if in_closed == True:
+                    continue
+
+                child_node.g  = current_node.g + 1
+                child_node.h = distance(child_node.position, end_node.position)
+                child_node.f = child_node.g + child_node.h
+
+                in_open_list = False
+                for open_node in open_list:
+                    if child_node.position == open_node.position:
+                        if child_node.g < open_node.g:
+                            open_node.g = child_node.g
+                            open_node.f = child_node.f
+                            open_node.parent = current_node
+                        in_open_list = True
+                        break
+
+                if in_open_list:
+                    continue
+                
+                open_list.append(child_node)
+
+        print("A* failed: we found no path :)")
+        return []
                         
-
-                        # print (current_node.position.x + i, current_node.position.x + j)
-                       # pass
-            
         
 
 
