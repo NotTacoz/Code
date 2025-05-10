@@ -1,0 +1,27 @@
+# Synopsis
+Prac Test 03 For COMP1005 Class uni.
+
+# Contents, Tree Structure
+├── __pycache__
+│   └── buzzness.cpython-311.pyc
+├── assignment.png - task sheet with required information
+├── buzzness.py - dependency that includes core functions like step_change
+├── task1.png - image of first task
+├── task1.py - appending bees to a list
+├── task2.png - image of second task
+├── task2.py - using a colormap and adding a subplot
+├── task3.py - expanding bee world
+├── task4.png - the fourth task image
+├── README
+└── task4.py - movement of bees
+
+## dependencies
+matplotlib - for graphing and stuff
+random - for rqnadom moore cell
+math - more maths functions
+
+## todays date
+2025-04-13
+
+## Author
+Thomas Han 22881119
