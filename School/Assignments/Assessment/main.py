@@ -436,7 +436,7 @@ class Simulation():
                     h_pos = hivepos2screen(pygame.Vector2(comb_center))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
                 if honey <=-2:
-                    col.hsla =((255, 255, 255, 100))
+                    col.hsla =((92, 100, 50, 100))
                     h_pos = hivepos2screen(pygame.Vector2(comb_center))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
                 i+=1
@@ -614,7 +614,7 @@ class Hive():
             # for every bee in inside
             # print(len(self.bees_inside), self.beelook)
             bee = self.bees_inside[self.beelook]
-            if bee.seeking_honey == True and self.beelook.role == 'worker':
+            if bee.seeking_honey == True:
                 self.bees_inside.pop(self.beelook) # always pops the 0th bee 
                 self.bees_outside.append(bee)
             else:
@@ -673,6 +673,7 @@ class Creature():
             self.size_scaled = self.size_raw * manager.scaled
         if self.role == 'queen':
             self.size_scaled = self.size_raw * manager.scaled + 6
+            self.seeking_honey = False
         else:
             self.size_scaled = self.size_raw * manager.scaled
 
@@ -730,7 +731,7 @@ class Creature():
                 steering += self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
 
                 if self.seeking_honey == False or self.role == 'queen':
-                    self.dohoneythings() # function to fill up the honey
+                    steering += self.dohoneythings() * 2.5 # function to fill up the honey
 
         if self.role == "queen":
             self.do_queen_things()
@@ -1158,8 +1159,10 @@ class Creature():
         i = 0
         j = 0 # counter
 
+        diff = pygame.Vector2(0,0)
+
         # check honey status
-        if self.honey <= 0:
+        if self.honey <= 0 and self.role == 'worker':
             print("im removing myself (from hive)")
             self.seeking_honey = True
             self.hive.bees_outside.append(self)
@@ -1169,17 +1172,19 @@ class Creature():
         for comb_honey in self.hive.combs_honey:
             for comb_honey_actual in comb_honey:
                 comb_pos = pygame.math.Vector2(self.hive.combs[i][0], self.hive.combs[i][1])
-                diff = comb_pos - self.hive_pos
                 if self.role == 'worker':
                     if 0 <= comb_honey_actual <= 100: # if it is not max and if it is not invalid
+                        diff = comb_pos - self.hive_pos
                         # print(comb_pos)
                         if pygame.math.Vector2.magnitude(diff) <= 1 and self.honey >= 0:
                             self.honey -= 0.1
                             self.hive.combs_honey[j, i%COMB_WIDTH] += 0.1
                 elif self.role == 'queen':
-                    if comb_honey_actual <= -1:
+                    if comb_honey_actual == -1:
+                        diff = comb_pos - self.hive_pos
+                        # print("i wanna go here", comb_pos, comb_honey_actual)
                         if pygame.math.Vector2.magnitude(diff) <= 1 and self.eggs > 0:
-                            self.egg -= 1
+                            self.eggs -= 1
                             self.hive.combs_honey[j, i%COMB_WIDTH] = -2 # egg value
                 i+=1
             j+=1
@@ -1187,10 +1192,15 @@ class Creature():
         if comb_pos:
             if pygame.math.Vector2.magnitude(diff) != 0:
                 nomForce = pygame.math.Vector2.normalize(diff) * self.speed
-                self.applyForce(nomForce)
+                return (nomForce)
             
     def draw_inside_hive(self):
-        pygame.draw.circle(screen, self.colour, hivepos2screen(self.hive_pos), (self.energy/20)) 
+        size = self.energy/20
+
+        if self.role == "queen":
+            size *= 2
+            pygame.draw.circle(screen, (255, 0, 0), hivepos2screen(self.hive_pos), size+2, 2) 
+        pygame.draw.circle(screen, self.colour, hivepos2screen(self.hive_pos), size) 
 
 
 
@@ -1230,8 +1240,6 @@ sim.add_background(background)
 sim.add_objs(background.maparr)
 
 def main():
-
-
     running = True
     while running:
         for event in pygame.event.get():
