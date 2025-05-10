@@ -614,7 +614,7 @@ class Hive():
             # for every bee in inside
             # print(len(self.bees_inside), self.beelook)
             bee = self.bees_inside[self.beelook]
-            if bee.seeking_honey == True:
+            if bee.seeking_honey == True and self.beelook.role == 'worker':
                 self.bees_inside.pop(self.beelook) # always pops the 0th bee 
                 self.bees_outside.append(bee)
             else:
