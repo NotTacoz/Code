@@ -712,7 +712,7 @@ class Creature():
         # im not entirely sure if this actually does anything
 
     def update(self, manager):
-        self.avoidedge(self.pos)
+        self.avoidedge()
         # print("my current pos is: ", self.pos)
 
         """This (below) is unsed a_star_pathfind code. It doesnt effect physics or the simulation at all and purely visual. 
@@ -752,8 +752,6 @@ class Creature():
             steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
 
             if self in self.hive.bees_inside:
-                self.avoidedge(self.hive_pos)
-             
                 steering += self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
 
                 if self.seeking_honey == False or self.role == 'queen':
@@ -1067,13 +1065,15 @@ class Creature():
 
         return force
 
-    def avoidedge(self, beepos):
-        if self in self.hive.bees_outside:
-            self.pos.x = max(0, min(self.pos.x, 128))
-            self.pos.y = max(0, min(self.pos.y, 128))
-        else:
-            self.hive_pos.x = max(0, min(self.hive_pos.x, 40))
-            self.hive_pos.y = max(0, min(self.hive_pos.y, 40))
+    def avoidedge(self):
+        """Despite saying avoid, in reality it clamps the bees position
+        The real avoid function occurs later."""
+        if self in self.hive.bees_outside: # Checks if it is outside
+            self.pos.x = max(0, min(self.pos.x, 128)) # Clamps from 0-128
+            self.pos.y = max(0, min(self.pos.y, 128)) # Same thing here
+        else: # Else, (basically if inside)
+            self.hive_pos.x = max(0, min(self.hive_pos.x, 40)) # Clamps 0-40
+            self.hive_pos.y = max(0, min(self.hive_pos.y, 40)) # same thing
 
         # note to self: add bottom left right border  too! future note: done!
 
