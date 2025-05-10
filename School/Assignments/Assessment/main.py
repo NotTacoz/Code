@@ -258,6 +258,13 @@ class Simulation():
     def rem_flo(self, flower):
         self.flowers.remove(flower)
 
+    def spawn_new_bee(self, hive, spawn_pos):
+        temp_bee = Creature(hive.pos.x, hive.pos.y, hive, self, "worker") # set this to queen for awesome exponential growth!
+
+        self.add(temp_bee)
+        hive.bees_inside.append(temp_bee)
+        temp_bee.hive_pos = pygame.Vector2(spawn_pos)
+
     def add_obstacles(self, obstacle):
         self.obstacles.append(obstacle)
         center_x = int(obstacle.pos.x)
@@ -535,7 +542,6 @@ class Hive():
         self.queenpop = H_INITIAL_QUEENS
         self.bees_inside = []
         self.bees_outside = []
-
         
         self.internal_cooldown = 0
 
@@ -607,6 +613,10 @@ class Hive():
         if self.beelook >= len(self.bees_inside): # resets beelook (the poninter in array) if its past the length of arr
             self.beelook = 0
 
+
+        if manager.frames % 60 == 1:
+            self.update_eggs(manager)
+
         self.size = manager.scaled*4
         if self.internal_cooldown == 0 and len(self.bees_inside) > 0:
             # bee to look at variable
@@ -624,6 +634,22 @@ class Hive():
             self.internal_cooldown -= 1
 
         self.draw(manager.camera_offset)
+
+    def update_eggs(self, manager):
+        # print(self.combs_honey)
+        a = 0
+        b=0
+        for i in self.combs_honey:
+            for j in i:
+                if j <= -2:
+                    self.combs_honey[a, b%COMB_WIDTH] -= 1 # do this if you want the eggs to grow by themselves
+
+                    if j <= -30: # amount of arbitrary relative growth to ""hatch""
+                        self.combs_honey[a, b%COMB_WIDTH] = -1 # egg value
+                        manager.spawn_new_bee(self, self.combs[b])
+                b+=1
+            a+=1
+
 
     def draw(self, camera_offset):
         screen_pos = gridpos2screen(self.pos, camera_offset)
@@ -712,7 +738,7 @@ class Creature():
 
         if is_outside:
             # calculate forces every 5 frames
-            if frames % 5 == self.selectedframe:
+            if manager.frames % 5 == self.selectedframe:
                 steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
 
             steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE) * 100
@@ -1160,6 +1186,7 @@ class Creature():
         j = 0 # counter
 
         diff = pygame.Vector2(0,0)
+        nomForce = pygame.Vector2(0,0)
 
         # check honey status
         if self.honey <= 0 and self.role == 'worker':
@@ -1172,6 +1199,7 @@ class Creature():
         for comb_honey in self.hive.combs_honey:
             for comb_honey_actual in comb_honey:
                 comb_pos = pygame.math.Vector2(self.hive.combs[i][0], self.hive.combs[i][1])
+                lowest_egg = -1
                 if self.role == 'worker':
                     if 0 <= comb_honey_actual <= 100: # if it is not max and if it is not invalid
                         diff = comb_pos - self.hive_pos
@@ -1180,19 +1208,20 @@ class Creature():
                             self.honey -= 0.1
                             self.hive.combs_honey[j, i%COMB_WIDTH] += 0.1
                 elif self.role == 'queen':
-                    if comb_honey_actual == -1:
+                    if lowest_egg <= comb_honey_actual <= -1:
+                        lowest_egg = comb_honey_actual
                         diff = comb_pos - self.hive_pos
                         # print("i wanna go here", comb_pos, comb_honey_actual)
                         if pygame.math.Vector2.magnitude(diff) <= 1 and self.eggs > 0:
                             self.eggs -= 1
-                            self.hive.combs_honey[j, i%COMB_WIDTH] = -2 # egg value
+                            self.hive.combs_honey[j, i%COMB_WIDTH] -= 1 # egg value
                 i+=1
             j+=1
         # 2. dif fpos from self
         if comb_pos:
             if pygame.math.Vector2.magnitude(diff) != 0:
                 nomForce = pygame.math.Vector2.normalize(diff) * self.speed
-                return (nomForce)
+        return (nomForce)
             
     def draw_inside_hive(self):
         size = self.energy/20
