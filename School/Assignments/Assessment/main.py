@@ -47,10 +47,11 @@ B_MAX_V = 0.1 # max velocit
 B_MIN_V = 0.02
 
 # hive constant
-H_INITIAL_WORKERS = 20
+H_INITIAL_WORKERS = 20 # also number of drones
 H_INITIAL_QUEENS = 1
 H_BEE_COOLDOWN = 3 # number of frames before a bee can exit/enter
 COMB_WIDTH, COMB_HEIGHT = 12, 9 # comb size in hive
+EGG_CELL_VALUE = -2 # if a cell contains an egg
 
 # FLOWERS
 F_SIZE = 8 # unscaled
@@ -380,7 +381,7 @@ class Simulation():
 
         gui_pos = pygame.Vector2(10,10) 
         gui_width = 300
-        gui_height = 170
+        gui_height = 200
         
         
         if (self.selected_bee):
@@ -396,10 +397,11 @@ class Simulation():
                 "Energy": bee.energy,
                 "Honey": bee.honey,
                 "Seeking Honey?": bee.seeking_honey,
-                "Closest Flower Position": bee.closestflower.pos,
+                "Closest Flower Position": (bee.closestflower.pos if bee.closestflower != None else "None"),
                 "Colour": bee.colour,
                 "Honey": bee.honey,
                 "Total Honey Aquired": bee.total_honey,
+                "Role": bee.role,
             }
             
             offset = 20
@@ -431,6 +433,10 @@ class Simulation():
                 if honey >= 0: # does not draw invalid combs (-1)
                     # print(honey)
                     col.hsla =((20+40*honey/100, 100, 50*honey/100+15, 100))
+                    h_pos = hivepos2screen(pygame.Vector2(comb_center))
+                    pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
+                if honey <=-2:
+                    col.hsla =((255, 255, 255, 100))
                     h_pos = hivepos2screen(pygame.Vector2(comb_center))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
                 i+=1
@@ -525,7 +531,7 @@ class Hive():
         self.pos=pygame.Vector2(x,y)
 
         self.workerspop = manager.number_of_bees
-        self.numbeesinside = self.workerspop
+        self.dronespop = self.workerspop
         self.queenpop = H_INITIAL_QUEENS
         self.bees_inside = []
         self.bees_outside = []
@@ -552,12 +558,12 @@ class Hive():
             sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
             self.bees_inside.append(temp_bee)
 
-        for i in range(self.queenpop):
-            offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
-            temp_bee = Creature(x,y, self, manager, "drone")
-
-            sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
-            self.bees_inside.append(temp_bee)
+        # for i in range(self.dronespop):
+        #     offset_pos = [((random.random()-0.5)*100), ((random.random()-0.5)*100)]
+        #     temp_bee = Creature(x,y, self, manager, "drone")
+        #
+        #     sim.add(temp_bee) # adds bee to the simulation since they are seeking it. once i add a hive view this will be edited
+        #     self.bees_inside.append(temp_bee)
 
         self.combs = []
         self.combs_honey = np.zeros((9,12))
@@ -659,9 +665,16 @@ class Creature():
 
         self.closestflower = None 
 
+        self.eggs = 0 # all start off with 0 eggs, only queen bees are able to "produce" eggs
+
         self.size_raw = self.energy/500
 
-        self.size_scaled = self.size_raw * manager.scaled
+        if self.role == 'worker':
+            self.size_scaled = self.size_raw * manager.scaled
+        if self.role == 'queen':
+            self.size_scaled = self.size_raw * manager.scaled + 6
+        else:
+            self.size_scaled = self.size_raw * manager.scaled
 
         self.radius = (self.size_scaled+2)
 
@@ -696,27 +709,34 @@ class Creature():
         if is_worker:
             self.whatamidoing()
 
-            if is_outside:
-                # calculate forces every 5 frames
-                if frames % 5 == self.selectedframe:
-                    steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
+        if is_outside:
+            # calculate forces every 5 frames
+            if frames % 5 == self.selectedframe:
+                steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
 
-                steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE) * 100
-                steering += self.avoidrock(self.pos, manager)
-                
+            steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE) * 100
+            steering += self.avoidrock(self.pos, manager)
+            
+            if is_worker:
                 self.seekFlowers(manager.flowers)
-                steering += self.avoidwater(manager.background.maparr) * 0.8
-            elif not is_outside: # inside considered
-                steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
 
-                if self in self.hive.bees_inside:
-                    self.avoidedge(self.hive_pos)
-                 
-                    steering += self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
+            steering += self.avoidwater(manager.background.maparr) * 0.8
+        elif not is_outside: # inside considered
+            steering += self.calculate_avoid_edge_force(self.hive_pos, 0, 40) * 100
 
-                    if self.seeking_honey == False:
-                        self.dohoneythings() # function to fill up the honey
+            if self in self.hive.bees_inside:
+                self.avoidedge(self.hive_pos)
+             
+                steering += self.calculateForces(self.hive.bees_inside, (self.hive_pos), None)
 
+                if self.seeking_honey == False or self.role == 'queen':
+                    self.dohoneythings() # function to fill up the honey
+
+        if self.role == "queen":
+            self.do_queen_things()
+
+        if self.role == "drone":
+            print("hullo i am a drone", is_outside, self.pos)
 
 
         self.applyForce(steering)
@@ -757,7 +777,12 @@ class Creature():
 
         self.size_raw = self.energy/500
 
-        self.size_scaled = self.size_raw * manager.scaled
+        if self.role == 'worker':
+            self.size_scaled = self.size_raw * manager.scaled
+        if self.role == 'queen':
+            self.size_scaled = self.size_raw * manager.scaled + 6
+        else:
+            self.size_scaled = self.size_raw * manager.scaled
 
         self.radius = (self.size_scaled+2)
 
@@ -776,6 +801,19 @@ class Creature():
 
         if self.honey >= self.min_honey:
             self.seeking_honey = False
+
+    def do_queen_things(self):
+        """func to include all queen behaviours"""
+        # 1. check eggs ready
+        # 2. if eggs ready > 1 lay an egg
+        # 3. egg will inhereit the genes of their parents (done later) 
+
+        if frames % 60 == 0:
+            self.eggs += 1
+
+        if self.eggs > 1:
+            pass    
+        # lay egg
 
     def a_star_pathfind(self, manager, in_pos, target_pos):
         """note about this implementation:
@@ -1130,13 +1168,19 @@ class Creature():
         comb_pos = None
         for comb_honey in self.hive.combs_honey:
             for comb_honey_actual in comb_honey:
-                if 0 <= comb_honey_actual <= 100: # if it is not max and if it is not invalid
-                    comb_pos = pygame.math.Vector2(self.hive.combs[i][0], self.hive.combs[i][1])
-                    # print(comb_pos)
-                    diff = comb_pos - self.hive_pos
-                    if pygame.math.Vector2.magnitude(diff) <= 1 and self.honey >= 0:
-                        self.honey -= 0.1
-                        self.hive.combs_honey[j, i%COMB_WIDTH] += 0.1
+                comb_pos = pygame.math.Vector2(self.hive.combs[i][0], self.hive.combs[i][1])
+                diff = comb_pos - self.hive_pos
+                if self.role == 'worker':
+                    if 0 <= comb_honey_actual <= 100: # if it is not max and if it is not invalid
+                        # print(comb_pos)
+                        if pygame.math.Vector2.magnitude(diff) <= 1 and self.honey >= 0:
+                            self.honey -= 0.1
+                            self.hive.combs_honey[j, i%COMB_WIDTH] += 0.1
+                elif self.role == 'queen':
+                    if comb_honey_actual <= -1:
+                        if pygame.math.Vector2.magnitude(diff) <= 1 and self.eggs > 0:
+                            self.egg -= 1
+                            self.hive.combs_honey[j, i%COMB_WIDTH] = -2 # egg value
                 i+=1
             j+=1
         # 2. dif fpos from self
