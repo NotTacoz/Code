@@ -643,6 +643,7 @@ class Simulation():
             screen.blit(panel_surface, ((WINDOW_WIDTH-gui_width - 10, WINDOW_HEIGHT-gui_height - 10)))
             
             bees_inside = self.selected_hive.bees_inside
+            print(self.selected_hive.combs_honey)
 
             ## drawing the comb
             col = pygame.Color(0)
@@ -766,8 +767,15 @@ class Obstacle():
 
 class Hive():
     def __init__(self,x,y, sim, manager):
+        """Initialize a hive.
+        
+        Args:
+            x: X-coordinate in the world grid
+            y: Y-coordinate in the world grid
+            sim: Simulation instance
+            manager: Simulation manager instance
+        """
         self.pos=pygame.Vector2(x,y)
-
         self.workerspop = manager.number_of_bees
         self.dronespop = self.workerspop
         self.queenpop = H_INITIAL_QUEENS
@@ -843,6 +851,7 @@ class Hive():
         self.draw(manager.camera_offset)
 
     def update_eggs(self, manager):
+        """this updates the hive every time its called, which is like every 60 frames i think"""
         a = 0
         b=0
         for i in self.combs_honey:
@@ -857,11 +866,13 @@ class Hive():
             a+=1
 
     def draw(self, camera_offset):
+        """draws the hive onto the screen"""
         screen_pos = gridpos2screen(self.pos, camera_offset)
         pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x-self.size/2, screen_pos.y-self.size/2, self.size, self.size))
 
 class Creature():
     def __init__(self, x, y, hive, manager, role):
+        """initialises the properties of the creature :DDD"""
         self.role = role
 
         self.pos = pygame.Vector2(x, y) #change pos later 
@@ -910,12 +921,14 @@ class Creature():
 
         self.selectedframe = random.randint(0, 5) # this is used to give the bee a random frame of the 5 frames, to ensure that the bee has a different, more random cycle. 
 
-        self.image_file = pygame.image.load('bee.png')
+        self.image_file = pygame.image.load('bee.png') # this is not used but it doesnt affect the rest of the code so its still here. why not
 
         # im not entirely sure if this actually does anything
 
     def update(self, manager):
         self.avoidedge() # clamps position to borders, does not avoid (diff function)
+        # for some reason i decided to change the avoidedge to a new function but i cbb changing every instance
+        # this is called after i changed this to position clamp. (so saurry)
 
         """This (below) is unsed a_star_pathfind code. It doesnt effect physics or the simulation at all and purely visual. 
         It looks nice (and interesting!), but I have found little reason to use it on top of the bee's already complex behaviour. 
@@ -936,12 +949,13 @@ class Creature():
 
         steering = pygame.Vector2(0,0)
 
-        if is_worker:
-            self.whatamidoing() # checks if needs to search for honey
 
-        if is_outside:
-            # calculate forces every 5 frames
-            if manager.frames % 5 == self.selectedframe:
+        if is_worker: # if bee is worker
+            self.whatamidoing() # checks if needs to search for honey 
+
+        if is_outside: # if bee is outside
+            # calculate forces every 5 frames. this saves computational oad
+            if manager.frames % 5 == self.selectedframe: # selected frame makes sure that bees calculate forces at different frames
                 steering += self.calculateForces(self.hive.bees_outside, self.pos, manager) # calculates all the forces to do/adds
 
             steering += self.calculate_avoid_edge_force(self.pos, 0, MAP_SIZE, 1) * 100
@@ -973,7 +987,8 @@ class Creature():
 
         
         fac = 30 # angle factor
-        rotate = (random.random() - 0.5)*fac
+        rotate = (random.random() - 0.5)*fac # random steering force
+
         self.velocity = pygame.math.Vector2.rotate(self.velocity, rotate)
         
         self.speed = pygame.math.Vector2.magnitude(self.velocity)
@@ -1040,15 +1055,16 @@ class Creature():
         if manager.frames % 60 == 0:
             self.eggs += 1
 
-        if self.eggs > 1:
-            pass    
-        # lay egg
+        # lay egg is in dohoneythings(
 
     def a_star_pathfind(self, manager, in_pos, target_pos):
         """note about this implementation:
         1. only works on grid (in this case MAP_SIZExMAP_SIZE which is 128x)
         2. i am schizophrenic so this might not wor
         3. this is based off random pseudocode i found in google images
+        i actually spent some time debugging this. but i just didnt find it productive to run this
+        expensive computation. realistically bees do not know the perfect path to any object so this is
+        left as is
         """
         print("we want to go from", in_pos, "to", target_pos)
         start_node=Node(None, in_pos)
@@ -1173,6 +1189,7 @@ class Creature():
                 self.honey += 0.5
                 self.total_honey += 0.5
                 self.closestflower.pollen -= 0.5
+                self.energy = min(self.energy + 0.5, CREATURE_INITIAL_ENERGY) # Replenish energy
         elif self.seeking_honey == False: # If it is no longer seeking honey.
             self.goHive()
     
@@ -1379,6 +1396,7 @@ class Creature():
                         if pygame.math.Vector2.magnitude(diff) <= 1 and self.honey >= 0:
                             self.honey -= 0.1
                             self.hive.combs_honey[j, i%COMB_WIDTH] += 0.1
+                            self.energy = min(self.energy + 0.5, CREATURE_INITIAL_ENERGY) # Replenish energy
                 elif self.role == 'queen':
                     if lowest_egg <= comb_honey_actual <= -1:
                         lowest_egg = comb_honey_actual
