@@ -220,7 +220,7 @@ def load_parameters_from_file(filepath: str) -> dict:
                 else:
                     print(f"Warning: Skipping malformed row in {filepath}: {row}")
     except FileNotFoundError:
-        print(f"Error: Parameter file {filepath} not found.")
+        print(f"Error: ruh oh Parameter file {filepath} not found.")
         sys.exit(1)
     except Exception as e:
         print(f"Error reading parameter file {filepath}: {e}")
@@ -451,6 +451,7 @@ class Simulation():
         self.initial_bee_energy = CREATURE_INITIAL_ENERGY
         self.hive_release_cooldown = H_BEE_COOLDOWN
         self.number_obstacles = N_OBSTACLES
+        self.number_of_hives = 10 # Default number of hives
 
         self.creatures = []
         self.hives = []
@@ -465,11 +466,12 @@ class Simulation():
 
         self.background = None
 
-    def update_values(self, number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles):
+    def update_values(self, number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles, number_of_hives):
         self.number_of_bees = number_of_bees
         self.initial_bee_energy = initial_bee_energy
         self.hive_release_cooldown = hive_release_cooldown
         self.number_obstacles = number_obstacles
+        self.number_of_hives = number_of_hives
         
     def add(self,creature):
         self.creatures.append(creature)
@@ -570,7 +572,7 @@ class Simulation():
     def add_objs(self, maparr):
         invalid_coords = []
 
-        for i in range(10):
+        for i in range(self.number_of_hives): # Use configured number of hives
             random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
             while maparr[int(random_coord.x)][int(random_coord.y)] >= BG_WATER_THRESHOLD or random_coord in invalid_coords:
                 random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
@@ -652,7 +654,7 @@ class Simulation():
                     h_pos = hivepos2screen(pygame.Vector2(comb_centre))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
                 if honey <=-2:
-                    col.hsla =((92, 100, 50, 100))
+                    col.hsla = (0, 100, max(min(50 * (-honey-1)/50 + 15,100),0), 100)
                     h_pos = hivepos2screen(pygame.Vector2(comb_centre))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
                 i+=1
@@ -1440,7 +1442,7 @@ if args.batch:
     BG_SAND_THRESHOLD = loaded_params.get('BG_SAND_THRESHOLD', BG_SAND_THRESHOLD)
 
     sim = Simulation()
-    sim.update_values(H_INITIAL_WORKERS, CREATURE_INITIAL_ENERGY, H_BEE_COOLDOWN, N_OBSTACLES)
+    sim.update_values(H_INITIAL_WORKERS, CREATURE_INITIAL_ENERGY, H_BEE_COOLDOWN, N_OBSTACLES, 10)
 
     # Seed precedence: 1. param file, 2. command line, 3. time-based
     if 'SEED' in loaded_params:
@@ -1453,20 +1455,58 @@ if args.batch:
 elif args.interactive:
     try:
         print("::::::::::::::::::::::INPUTS::[Interactive Mode]::::::::::::::::::::::")
-        number_of_bees = int(x) if (x := input(f"Number of bees per hive (default={H_INITIAL_WORKERS}): ")) else H_INITIAL_WORKERS
-        initial_bee_energy = int(x) if (x := input(f"Bee Initial Energy (default={CREATURE_INITIAL_ENERGY}): ")) else CREATURE_INITIAL_ENERGY
-        hive_release_cooldown = int(x) if (x := input(f"Hive Bee Release Cooldown (default={H_BEE_COOLDOWN} frames): ")) else H_BEE_COOLDOWN
-        number_obstacles = int(x) if (x := input(f"Number of obstacles (default={N_OBSTACLES}): ")) else N_OBSTACLES
+        number_of_bees = int(x) if (x := input(f"Number of bees per hive (default={H_INITIAL_WORKERS}) (1-100): ")) else H_INITIAL_WORKERS
+        number_of_bees = max(1, min(number_of_bees, 100))
+        
+        initial_bee_energy = int(x) if (x := input(f"Bee Initial Energy (default={CREATURE_INITIAL_ENERGY}) (10-1000) WARNING: BEE SIZE SCALES WITH ENERGY!: ")) else CREATURE_INITIAL_ENERGY
+        initial_bee_energy = max(10, min(initial_bee_energy, 1000))
+        
+        hive_release_cooldown = int(x) if (x := input(f"Hive Bee Release Cooldown (default={H_BEE_COOLDOWN}) (0-300)")) else H_BEE_COOLDOWN
+        hive_release_cooldown = max(0, min(hive_release_cooldown, 300))
+        
+        number_obstacles = int(x) if (x := input(f"Number of obstacles (default={N_OBSTACLES}) (0-100): ")) else N_OBSTACLES
+        number_obstacles = max(0, min(number_obstacles, 100))
+        
+        # New inputs
+        N_HIVES_INTERACTIVE = 10 # Default for sim instance if not changed by input
+        N_HIVES_INTERACTIVE = int(x) if (x := input(f"Number of hives (default={N_HIVES_INTERACTIVE}) (1-50): ")) else N_HIVES_INTERACTIVE
+        N_HIVES_INTERACTIVE = max(1, min(N_HIVES_INTERACTIVE, 50))
+        
+        H_INITIAL_QUEENS = int(x) if (x := input(f"Initial queens per hive (default={H_INITIAL_QUEENS}) (0-10): ")) else H_INITIAL_QUEENS
+        H_INITIAL_QUEENS = max(0, min(H_INITIAL_QUEENS, 10))
+        
+        CREATURE_MAX_VELOCITY = float(x) if (x := input(f"Creature Max Velocity (default={CREATURE_MAX_VELOCITY}) (0.01-1.0): ")) else CREATURE_MAX_VELOCITY
+        CREATURE_MAX_VELOCITY = max(0.01, min(CREATURE_MAX_VELOCITY, 1.0))
+        
+        CREATURE_MIN_VELOCITY = float(x) if (x := input(f"Creature Min Velocity (default={CREATURE_MIN_VELOCITY}) (0.001-0.5): ")) else CREATURE_MIN_VELOCITY
+        CREATURE_MIN_VELOCITY = max(0.001, min(CREATURE_MIN_VELOCITY, 0.5))
+        CREATURE_MIN_VELOCITY = min(CREATURE_MIN_VELOCITY, CREATURE_MAX_VELOCITY) # Ensure min_vel <= max_vel
+        
+        CREATURE_DETECTION_RADIUS = float(x) if (x := input(f"Creature Detection Radius (default={CREATURE_DETECTION_RADIUS}) (0.1-20.0): ")) else CREATURE_DETECTION_RADIUS
+        CREATURE_DETECTION_RADIUS = max(0.1, min(CREATURE_DETECTION_RADIUS, 20.0))
+        
+        CREATURE_SEPARATION_THRESHOLD = float(x) if (x := input(f"Creature Separation Threshold (default={CREATURE_SEPARATION_THRESHOLD}) (0.1-10.0): ")) else CREATURE_SEPARATION_THRESHOLD
+        CREATURE_SEPARATION_THRESHOLD = max(0.1, min(CREATURE_SEPARATION_THRESHOLD, 10.0))
+        CREATURE_SEPARATION_THRESHOLD = min(CREATURE_SEPARATION_THRESHOLD, CREATURE_DETECTION_RADIUS) # Ensure sep_thresh <= detect_radius
+        
+        F_SIZE = int(x) if (x := input(f"Flower Size (default={F_SIZE}): ")) else F_SIZE
+        F_SIZE = max(1, min(F_SIZE, 20))
+        
         sim = Simulation() # Create sim instance here for interactive mode too
-        sim.update_values(number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles)
+        sim.update_values(number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles, N_HIVES_INTERACTIVE)
         print("::::::::::::::::::::::[End Interactive Mode]::::::::::::::::::::::")
         if args.seed is not None:
             seed = args.seed
-        else:
-            seed = int(time.time())
     except ValueError:
         print("Input Error: Check your inputs and try again. Using default values.")
         sim = Simulation() # Fallback to default sim if input error
+        # Ensure global constants are at their defaults if interactive input fails before they are set
+        H_INITIAL_QUEENS = 1
+        CREATURE_MAX_VELOCITY = 0.1
+        CREATURE_MIN_VELOCITY = 0.02
+        CREATURE_DETECTION_RADIUS = 2.5
+        CREATURE_SEPARATION_THRESHOLD = 0.7
+        F_SIZE = 8
         if args.seed is not None:
             seed = args.seed
         else:
