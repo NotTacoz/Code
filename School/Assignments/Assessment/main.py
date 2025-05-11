@@ -341,18 +341,33 @@ class Environment:
         Returns:
             tuple: RGB color values for the terrain
         """
-        c = round(255 * (pno**BG_COLOUR_DULLNESS_EXP))
-        fav = round(255 * (pno**BG_COLOUR_VIBRANCY_EXP))
+        # Ensure pno is within expected 0-1 range, helps prevent math errors with exponents
+        pno = max(0.0, min(1.0, pno))
+
+        c_float = 255 * (pno**BG_COLOUR_DULLNESS_EXP)
+        fav_float = 255 * (pno**BG_COLOUR_VIBRANCY_EXP)
+
+        # Base values, rounded and clamped
+        c = max(0, min(255, int(round(c_float))))
+        fav = max(0, min(255, int(round(fav_float))))
 
         if pno >= BG_WATER_THRESHOLD:
             # Water tiles - blue tones
-            return (max(0, 220 - c), max(0, 200 - (c/2)), fav)
+            r = max(0, min(255, int(round(220 - c_float))))
+            g = max(0, min(255, int(round(200 - (c_float / 2.0)))))
+            b = fav # fav is already calculated from fav_float, rounded and clamped
+            return (r, g, b)
         elif BG_SAND_THRESHOLD < pno < BG_WATER_THRESHOLD:
             # Sand tiles - yellow tones
+            # fav is already calculated, rounded and clamped
+            # c is already calculated, rounded and clamped
             return (fav, fav, c)
         else:
             # Land tiles - green tones
-            return (c, fav+15, c-10)
+            r = c # c is already calculated, rounded and clamped
+            g = max(0, min(255, int(round(fav_float + 15))))
+            b = max(0, min(255, int(round(c_float - 10))))
+            return (r, g, b)
 
     def update_background(self, size: int, camera_offset: pygame.Vector2, scaled_value: float) -> pygame.Surface:
         """Update the background surface if camera or scale changed.
