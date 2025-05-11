@@ -55,7 +55,7 @@ CAMERA_BORDER_MARGIN = 5
 
 # Creature properties
 CREATURE_INITIAL_ENERGY = 100
-CREATURE_ENERGY_DECAY_RATE = 0
+CREATURE_ENERGY_DECAY_RATE = 1
 CREATURE_DETECTION_RADIUS = 2.5
 CREATURE_SEPARATION_THRESHOLD = 0.7
 CREATURE_MAX_VELOCITY = 0.1
@@ -466,6 +466,16 @@ class Simulation():
 
         self.background = None
 
+        # Population graph attributes
+        self.population_history = []
+        self.graph_update_interval = FPS # Update graph data once per second
+        self.max_history_points = 200 # Store last 100 data points for the graph
+        self.graph_rect = pygame.Rect(WINDOW_WIDTH - 230, 10, 220, 100) # Position and size
+        self.graph_bg_color = (30, 30, 30, 180) # Semi-transparent dark background
+        self.graph_line_color = (0, 255, 0) # Green line for population
+        self.graph_axis_color = (150, 150, 150)
+        self.graph_text_color = (200, 200, 200)
+
     def update_values(self, number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles, number_of_hives):
         self.number_of_bees = number_of_bees
         self.initial_bee_energy = initial_bee_energy
@@ -525,8 +535,16 @@ class Simulation():
         for obstacle in self.obstacles[:]: 
             obstacle.update(self)
 
+        # Update population history for the graph
+        if self.frames % self.graph_update_interval == 0:
+            current_population = len(self.creatures)
+            self.population_history.append(current_population)
+            if len(self.population_history) > self.max_history_points:
+                self.population_history = self.population_history[-self.max_history_points:] # Keep last N points
+
         self.show_selected()
         self.check_mouse_movement()
+        self.draw_population_graph() # Draw the population graph
 
     def check_mouse_movement(self):
         mouse = pygame.math.Vector2(pygame.mouse.get_pos())
@@ -643,7 +661,6 @@ class Simulation():
             screen.blit(panel_surface, ((WINDOW_WIDTH-gui_width - 10, WINDOW_HEIGHT-gui_height - 10)))
             
             bees_inside = self.selected_hive.bees_inside
-            print(self.selected_hive.combs_honey)
 
             ## drawing the comb
             col = pygame.Color(0)
@@ -655,7 +672,7 @@ class Simulation():
                     h_pos = hivepos2screen(pygame.Vector2(comb_centre))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
                 if honey <=-2:
-                    col.hsla = (0, 100, max(min(50 * (-honey-1)/50 + 15,100),0), 100)
+                    col.hsla = (0, 100, max(min(50 * (-honey-1)/30 + 15,100),0), 100)
                     h_pos = hivepos2screen(pygame.Vector2(comb_centre))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
                 i+=1
@@ -663,7 +680,67 @@ class Simulation():
             for bee in self.selected_hive.bees_inside:
                 bee.draw_inside_hive()
 
+    def draw_population_graph(self):
+        # Draw background for the graph
+        graph_surface = pygame.Surface(self.graph_rect.size, pygame.SRCALPHA)
+        graph_surface.fill(self.graph_bg_color)
+        screen.blit(graph_surface, self.graph_rect.topleft)
 
+        # Draw border for the graph area
+        pygame.draw.rect(screen, self.graph_axis_color, self.graph_rect, 1)
+        
+        # Draw Title
+        draw_text(screen, "Bee Population", STATS_FONT, self.graph_text_color, 
+                  (self.graph_rect.centerx, self.graph_rect.top + 5), anchor="midtop")
+
+        if len(self.population_history) < 2:
+            # Not enough data to draw a line
+            info_text = "Collecting data..." if not self.population_history else f"Pop: {self.population_history[0]}"
+            draw_text(screen, info_text, STATS_FONT, self.graph_text_color,
+                      self.graph_rect.center, anchor="center")
+            return
+
+        max_pop = max(self.population_history) if self.population_history else 1
+        min_pop = min(self.population_history) if self.population_history else 0
+        
+        # Adjust max_pop slightly for padding if all values are the same or min_pop == max_pop
+        if max_pop == min_pop:
+            max_pop += 1 # Avoid division by zero and give some space
+
+        points = []
+        history_len = len(self.population_history)
+        
+        padding_y = 15 # Pixels from top and bottom of graph area for text
+        drawable_height = self.graph_rect.height - 2 * padding_y
+        
+        for i, pop_count in enumerate(self.population_history):
+            # X coordinate: evenly spaced across the graph width
+            x = self.graph_rect.left + (i / (self.max_history_points -1)) * self.graph_rect.width \
+                if self.max_history_points > 1 else self.graph_rect.left # Handle case of 1 point
+            
+            # Y coordinate: scaled population count
+            # Ensure pop_count is within [min_pop, max_pop] for scaling
+            # Scale pop_count to fit within drawable_height
+            # Invert Y because Pygame's Y is 0 at top
+            y_scaled_value = 0
+            if (max_pop - min_pop) > 0: # Avoid division by zero
+                 y_scaled_value = (pop_count - min_pop) / (max_pop - min_pop)
+
+            y = self.graph_rect.bottom - padding_y - (y_scaled_value * drawable_height)
+            
+            points.append((x, y))
+
+        if len(points) >= 2:
+            pygame.draw.lines(screen, self.graph_line_color, False, points, 1)
+
+        # Draw current and max population text
+        current_pop_text = f"Now: {self.population_history[-1]}"
+        max_pop_text = f"Max: {max(self.population_history)}" # Recalculate for display based on current history
+        
+        draw_text(screen, current_pop_text, STATS_FONT, self.graph_text_color,
+                  (self.graph_rect.left + 5, self.graph_rect.bottom - padding_y + 2), anchor="bottomleft")
+        draw_text(screen, max_pop_text, STATS_FONT, self.graph_text_color,
+                  (self.graph_rect.right - 5, self.graph_rect.bottom - padding_y + 2), anchor="bottomright")
 
 class Flower:
     """Represents a flower in the simulation that bees can collect pollen from.
@@ -852,23 +929,37 @@ class Hive():
 
     def update_eggs(self, manager):
         """this updates the hive every time its called, which is like every 60 frames i think"""
-        a = 0
-        b=0
-        for i in self.combs_honey:
-            for j in i:
-                if j <= -2:
-                    self.combs_honey[a, b%COMB_WIDTH] -= 1
+        for r_egg, row_data in enumerate(self.combs_honey):
+            for c_egg, egg_value_at_iteration_start in enumerate(row_data):
+                if egg_value_at_iteration_start <= EGG_CELL_VALUE:  # Is it an egg cell?
+                    # Decrement the egg value in the hive's storage
+                    self.combs_honey[r_egg, c_egg] -= 1
+                    
+                    # Check for maturation using the egg's value *before* this frame's decrement
+                    if egg_value_at_iteration_start <= -30:  # Egg fully matured (threshold is -30)
+                        # Search for cells with > 80 honey
+                        honey_rows, honey_cols = np.where(self.combs_honey > 80) # Honey requirement is 80
+                        
+                        if honey_rows.size >= 5: # Check if there are at least 5 cells with enough honey
+                            # Consume honey from the first 5 found cells
+                            for i in range(5):
+                                r_honey_consume, c_honey_consume = honey_rows[i], honey_cols[i]
+                                self.combs_honey[r_honey_consume, c_honey_consume] = 0
+                            
+                            # Reset egg cell (which was just decremented, now set to -1)
+                            self.combs_honey[r_egg, c_egg] = -1 
 
-                    if j <= -30:
-                        self.combs_honey[a, b%COMB_WIDTH] = -1
-                        manager.spawn_new_bee(self, self.combs[b])
-                b+=1
-            a+=1
+                            # Spawn bee
+                            flat_egg_cell_idx = r_egg * COMB_WIDTH + c_egg
+                            manager.spawn_new_bee(self, self.combs[flat_egg_cell_idx])
+                            
+                            return # Spawn one bee per update_eggs call and exit
 
     def draw(self, camera_offset):
         """draws the hive onto the screen"""
         screen_pos = gridpos2screen(self.pos, camera_offset)
         pygame.draw.rect(screen, (255, 255, 0), (screen_pos.x-self.size/2, screen_pos.y-self.size/2, self.size, self.size))
+        draw_text(screen, f"{len(self.bees_inside) + len(self.bees_outside)}", STATS_FONT, (0,0,0), screen_pos)
 
 class Creature():
     def __init__(self, x, y, hive, manager, role):
@@ -877,7 +968,7 @@ class Creature():
 
         self.pos = pygame.Vector2(x, y) #change pos later 
         
-        self.energy = manager.initial_bee_energy
+        self.energy = manager.initial_bee_energy + random.randint(0, 10)
 
         self.honey = 0
 
@@ -905,7 +996,7 @@ class Creature():
 
         self.closestflower = None 
 
-        self.eggs = 0 # all start off with 0 eggs, only queen bees are able to "produce" eggs
+        self.eggs = 100 # all start off with 0 eggs, only queen bees are able to "produce" eggs
 
         self.size_raw = self.energy/500
 
@@ -973,9 +1064,6 @@ class Creature():
 
                 if self.seeking_honey == False or self.role == 'queen':
                     steering += self.dohoneythings() * 2.5 # function to fill up the honey
-
-        if self.role == "queen":
-            self.do_queen_things(manager)
 
         if self.role == "drone":
             print("hullo i am a drone", is_outside, self.pos)
@@ -1188,7 +1276,7 @@ class Creature():
             if distance(self.pos, self.closestflower.pos) <= CREATURE_DETECTION_RADIUS/4:
                 self.honey += 0.5
                 self.total_honey += 0.5
-                self.closestflower.pollen -= 0.5
+                # self.closestflower.pollen -= 0.5 pollen does not introduce the behavi
                 self.energy = min(self.energy + 0.5, CREATURE_INITIAL_ENERGY) # Replenish energy
         elif self.seeking_honey == False: # If it is no longer seeking honey.
             self.goHive()
