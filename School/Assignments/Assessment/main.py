@@ -54,7 +54,7 @@ CAMERA_SCROLL_SPEED = 25
 CAMERA_BORDER_MARGIN = 5
 
 # Creature properties
-CREATURE_INITIAL_ENERGY = 100
+CREATURE_INITIAL_ENERGY = 50
 CREATURE_ENERGY_DECAY_RATE = 1
 CREATURE_DETECTION_RADIUS = 2.5
 CREATURE_SEPARATION_THRESHOLD = 0.7
@@ -940,9 +940,9 @@ class Hive():
                         # Search for cells with > 80 honey
                         honey_rows, honey_cols = np.where(self.combs_honey > 80) # Honey requirement is 80
                         
-                        if honey_rows.size >= 5: # Check if there are at least 5 cells with enough honey
+                        if honey_rows.size >= 2: # Check if there are at least 5 cells with enough honey
                             # Consume honey from the first 5 found cells
-                            for i in range(5):
+                            for i in range(2):
                                 r_honey_consume, c_honey_consume = honey_rows[i], honey_cols[i]
                                 self.combs_honey[r_honey_consume, c_honey_consume] = 0
                             
@@ -968,7 +968,7 @@ class Creature():
 
         self.pos = pygame.Vector2(x, y) #change pos later 
         
-        self.energy = manager.initial_bee_energy + random.randint(0, 10)
+        self.energy = random.randint(round(manager.initial_bee_energy/2), round(manager.initial_bee_energy)) 
 
         self.honey = 0
 
@@ -1040,6 +1040,10 @@ class Creature():
 
         steering = pygame.Vector2(0,0)
 
+        if self.role == "queen":
+            if manager.frames % 60 == 0:
+                self.eggs += 1
+
 
         if is_worker: # if bee is worker
             self.whatamidoing() # checks if needs to search for honey 
@@ -1094,12 +1098,13 @@ class Creature():
         
         self.selected = (manager.selected_bee == self)
 
-        if manager.frames % FPS == 0: 
+        if manager.frames % FPS == 0 and self.role != "queen":  # queens dont die!
             self.energy = self.energy - CREATURE_ENERGY_DECAY_RATE
             # print(self.energy)
 
         if self.energy <= 0:
             print("creature ran out of energy :(")
+            self.closestflower.n_bees -= 1
             if is_outside:
                 self.hive.bees_outside.remove(self)
             else:
@@ -1133,17 +1138,6 @@ class Creature():
 
         if self.honey >= self.min_honey: # If more than min
             self.seeking_honey = False # No longer seeking!
-
-    def do_queen_things(self, manager):
-        """func to include all queen behaviours"""
-        # 1. check eggs ready
-        # 2. if eggs ready > 1 lay an egg
-        # 3. egg will inhereit the genes of their parents (done later) 
-
-        if manager.frames % 60 == 0:
-            self.eggs += 1
-
-        # lay egg is in dohoneythings(
 
     def a_star_pathfind(self, manager, in_pos, target_pos):
         """note about this implementation:
@@ -1482,7 +1476,7 @@ class Creature():
                     if 0 <= comb_honey_actual <= 100:
                         diff = comb_pos - self.hive_pos
                         if pygame.math.Vector2.magnitude(diff) <= 1 and self.honey >= 0:
-                            self.honey -= 0.1
+                            self.honey = max(self.honey - 0.1, 0)
                             self.hive.combs_honey[j, i%COMB_WIDTH] += 0.1
                             self.energy = min(self.energy + 0.5, CREATURE_INITIAL_ENERGY) # Replenish energy
                 elif self.role == 'queen':
@@ -1504,7 +1498,7 @@ class Creature():
         size = self.energy/20
 
         if self.role == "queen":
-            size *= 2
+            size *= 5
             pygame.draw.circle(screen, (255, 0, 0), hivepos2screen(self.hive_pos), size+2, 2) 
         pygame.draw.circle(screen, self.colour, hivepos2screen(self.hive_pos), size)
 
