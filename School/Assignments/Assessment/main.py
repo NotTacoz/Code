@@ -358,7 +358,7 @@ class Simulation():
     def add_objs(self, maparr):
         invalid_coords = []
 
-        for i in range(2):
+        for i in range(10):
             random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
             while maparr[int(random_coord.x)][int(random_coord.y)] >= B_WATER_THRESH or random_coord in invalid_coords:
                 random_coord = pygame.Vector2(random.randint(5,123),random.randint(5,123))
@@ -712,8 +712,7 @@ class Creature():
         # im not entirely sure if this actually does anything
 
     def update(self, manager):
-        self.avoidedge()
-        # print("my current pos is: ", self.pos)
+        self.avoidedge() # clamps position to borders, does not avoid (diff function)
 
         """This (below) is unsed a_star_pathfind code. It doesnt effect physics or the simulation at all and purely visual. 
         It looks nice (and interesting!), but I have found little reason to use it on top of the bee's already complex behaviour. 
@@ -729,12 +728,13 @@ class Creature():
         #         random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
         #
         #     self.a_star_pathfind(manager, self.hive.pos, random_pos)
-        is_worker = self.role == "worker" 
-        is_outside = self in self.hive.bees_outside
+        is_worker = self.role == "worker" # boolean true if worker 
+        is_outside = self in self.hive.bees_outside # boolean true if outside
+
         steering = pygame.Vector2(0,0)
 
         if is_worker:
-            self.whatamidoing()
+            self.whatamidoing() # checks if needs to search for honey
 
         if is_outside:
             # calculate forces every 5 frames
@@ -822,10 +822,11 @@ class Creature():
         self.acceleration += force / 15
 
     def whatamidoing(self):
-        self.min_honey = 80
+        """Checks to see if the bee has enough honey"""
+        self.min_honey = 80 # Min Honey
 
-        if self.honey >= self.min_honey:
-            self.seeking_honey = False
+        if self.honey >= self.min_honey: # If more than min
+            self.seeking_honey = False # No longer seeking!
 
     def do_queen_things(self):
         """func to include all queen behaviours"""
