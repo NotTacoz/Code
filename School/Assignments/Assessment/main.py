@@ -29,6 +29,7 @@ import time
 import pygame
 import numpy as np
 from noise import pnoise2
+import csv
 
 # Configuration Constants
 # ---------------------
@@ -192,6 +193,40 @@ def get_sigmoid(x: float) -> float:
     """
     return 1 / (1 + math.exp(-x))
 
+def load_parameters_from_file(filepath: str) -> dict:
+    """Load simulation parameters from a CSV file.
+
+    Args:
+        filepath: Path to the parameter CSV file.
+
+    Returns:
+        dict: A dictionary of parameters.
+    """
+    parameters = {}
+    try:
+        with open(filepath, mode='r', newline='') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                if len(row) == 2:
+                    param_name, param_value = row
+                    # Attempt to convert to int or float if possible
+                    try:
+                        if '.' in param_value:
+                            parameters[param_name.strip()] = float(param_value.strip())
+                        else:
+                            parameters[param_name.strip()] = int(param_value.strip())
+                    except ValueError:
+                        parameters[param_name.strip()] = param_value.strip() # Store as string if conversion fails
+                else:
+                    print(f"Warning: Skipping malformed row in {filepath}: {row}")
+    except FileNotFoundError:
+        print(f"Error: Parameter file {filepath} not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error reading parameter file {filepath}: {e}")
+        sys.exit(1)
+    return parameters
+
 class Environment:
     """Manages the simulation environment including terrain generation and rendering.
     
@@ -222,6 +257,52 @@ class Environment:
         self.cached_bg = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
         self.cached_camera_offset = pygame.Vector2(-1, -1)
         self.cached_scaled = -1
+
+    def load_map_from_file(self, filepath: str, map_size_param: int) -> None:
+        """Load map terrain data from a CSV file.
+
+        Args:
+            filepath: Path to the map CSV file.
+            map_size_param: The expected size of the map (MAP_SIZE).
+        """
+        try:
+            loaded_map_data = []
+            with open(filepath, mode='r', newline='') as file:
+                reader = csv.reader(file)
+                for row_index, row in enumerate(reader):
+                    if len(row) != map_size_param:
+                        print(f"Error: Map file {filepath} row {row_index+1} has incorrect number of columns. Expected {map_size_param}, got {len(row)}.")
+                        sys.exit(1)
+                    try:
+                        loaded_map_data.append([float(val) for val in row])
+                    except ValueError as e:
+                        print(f"Error: Non-numeric value found in map file {filepath} at row {row_index+1}: {e}")
+                        sys.exit(1)
+            
+            if len(loaded_map_data) != map_size_param:
+                print(f"Error: Map file {filepath} has incorrect number of rows. Expected {map_size_param}, got {len(loaded_map_data)}.")
+                sys.exit(1)
+
+            self.maparr = np.array(loaded_map_data, dtype=float)
+            
+            # Validate that all values are between 0 and 1 (inclusive)
+            if not np.all((self.maparr >= 0) & (self.maparr <= 1)):
+                print(f"Error: Map file {filepath} contains values outside the expected range [0, 1].")
+                sys.exit(1)
+
+            self.map_col = np.empty((map_size_param, map_size_param), dtype=object)
+            for i in range(map_size_param):
+                for j in range(map_size_param):
+                    self.map_col[i][j] = self.get_tile_colour(self.maparr[i][j])
+            
+            print(f"Successfully loaded map from {filepath}")
+
+        except FileNotFoundError:
+            print(f"Error: Map file {filepath} not found.")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error reading map file {filepath}: {e}")
+            sys.exit(1)
 
     def generate_background_texture(self, size: int) -> None:
         """Generate the background terrain using Perlin noise.
@@ -863,7 +944,7 @@ class Creature():
                     steering += self.dohoneythings() * 2.5 # function to fill up the honey
 
         if self.role == "queen":
-            self.do_queen_things()
+            self.do_queen_things(manager)
 
         if self.role == "drone":
             print("hullo i am a drone", is_outside, self.pos)
@@ -893,7 +974,7 @@ class Creature():
         
         self.selected = (manager.selected_bee == self)
 
-        if frames % FPS == 0: 
+        if manager.frames % FPS == 0: 
             self.energy = self.energy - CREATURE_ENERGY_DECAY_RATE
             # print(self.energy)
 
@@ -933,13 +1014,13 @@ class Creature():
         if self.honey >= self.min_honey: # If more than min
             self.seeking_honey = False # No longer seeking!
 
-    def do_queen_things(self):
+    def do_queen_things(self, manager):
         """func to include all queen behaviours"""
         # 1. check eggs ready
         # 2. if eggs ready > 1 lay an egg
         # 3. egg will inhereit the genes of their parents (done later) 
 
-        if frames % 60 == 0:
+        if manager.frames % 60 == 0:
             self.eggs += 1
 
         if self.eggs > 1:
@@ -1310,31 +1391,85 @@ parser = argparse.ArgumentParser(description="Simulate Bees")
 
 parser.add_argument('-i', '--interactive', action='store_true', help='interactive mode')
 parser.add_argument('-s', '--seed', type=int, help='random seed for terrain and spawning')
+parser.add_argument('-b', '--batch', action='store_true', help='Run in batch mode. Requires -f and -p.')
+parser.add_argument('-f', '--mapfile', type=str, help='Path to the map data file (e.g., map1.csv) for batch mode.')
+parser.add_argument('-p', '--paramfile', type=str, help='Path to the parameter file (e.g., para1.csv) for batch mode.')
 
 args = parser.parse_args()
 
 # Set random seed
-if args.seed is not None:
-    seed = args.seed
-else:
-    seed = int(time.time())
-random.seed(seed)
-print(f"Using seed: {seed}")
+seed = None
+param_file_path = None # Define to ensure it's available in all branches
 
-sim = Simulation()
+if args.batch:
+    if not args.mapfile or not args.paramfile:
+        print("Error: Batch mode requires both --mapfile (-f) and --paramfile (-p) to be specified.")
+        sys.exit(1)
+    print("Running in batch mode.")
+    param_file_path = args.paramfile
+    loaded_params = load_parameters_from_file(param_file_path)
 
-if args.interactive:
+    # Update global constants and simulation parameters from the loaded file
+    # This requires careful handling as many constants are currently global.
+    # For now, we will update sim instance directly and relevant globals where easy.
+    H_INITIAL_WORKERS = loaded_params.get('H_INITIAL_WORKERS', H_INITIAL_WORKERS)
+    CREATURE_INITIAL_ENERGY = loaded_params.get('CREATURE_INITIAL_ENERGY', CREATURE_INITIAL_ENERGY)
+    H_BEE_COOLDOWN = loaded_params.get('H_BEE_COOLDOWN', H_BEE_COOLDOWN)
+    N_OBSTACLES = loaded_params.get('N_OBSTACLES', N_OBSTACLES)
+    MAP_SIZE = loaded_params.get('MAP_SIZE', MAP_SIZE) # Ensure MAP_SIZE is updated before Environment creation
+    FPS = loaded_params.get('FPS', FPS)
+    # Add other parameters as needed, e.g., for Environment or Creature
+    BG_NOISE_OCTAVES = loaded_params.get('BG_NOISE_OCTAVES', BG_NOISE_OCTAVES)
+    BG_NOISE_SCALE = loaded_params.get('BG_NOISE_SCALE', BG_NOISE_SCALE)
+    BG_WATER_THRESHOLD = loaded_params.get('BG_WATER_THRESHOLD', BG_WATER_THRESHOLD)
+    BG_SAND_THRESHOLD = loaded_params.get('BG_SAND_THRESHOLD', BG_SAND_THRESHOLD)
+
+    sim = Simulation()
+    sim.update_values(H_INITIAL_WORKERS, CREATURE_INITIAL_ENERGY, H_BEE_COOLDOWN, N_OBSTACLES)
+
+    # Seed precedence: 1. param file, 2. command line, 3. time-based
+    if 'SEED' in loaded_params:
+        seed = int(loaded_params['SEED'])
+    elif args.seed is not None:
+        seed = args.seed
+    else:
+        seed = int(time.time())
+
+elif args.interactive:
     try:
         print("::::::::::::::::::::::INPUTS::[Interactive Mode]::::::::::::::::::::::")
         number_of_bees = int(x) if (x := input(f"Number of bees per hive (default={H_INITIAL_WORKERS}): ")) else H_INITIAL_WORKERS
         initial_bee_energy = int(x) if (x := input(f"Bee Initial Energy (default={CREATURE_INITIAL_ENERGY}): ")) else CREATURE_INITIAL_ENERGY
         hive_release_cooldown = int(x) if (x := input(f"Hive Bee Release Cooldown (default={H_BEE_COOLDOWN} frames): ")) else H_BEE_COOLDOWN
         number_obstacles = int(x) if (x := input(f"Number of obstacles (default={N_OBSTACLES}): ")) else N_OBSTACLES
+        sim = Simulation() # Create sim instance here for interactive mode too
         sim.update_values(number_of_bees, initial_bee_energy, hive_release_cooldown, number_obstacles)
         print("::::::::::::::::::::::[End Interactive Mode]::::::::::::::::::::::")
-    except:
-        print("Input Error: Check your inputs and try again")
-frames = 0
+        if args.seed is not None:
+            seed = args.seed
+        else:
+            seed = int(time.time())
+    except ValueError:
+        print("Input Error: Check your inputs and try again. Using default values.")
+        sim = Simulation() # Fallback to default sim if input error
+        if args.seed is not None:
+            seed = args.seed
+        else:
+            seed = int(time.time())
+else:
+    # Default mode (no batch, no interactive)
+    sim = Simulation()
+    if args.seed is not None:
+        seed = args.seed
+    else:
+        seed = int(time.time())
+
+random.seed(seed)
+print(f"Using seed: {seed}")
+if param_file_path:
+    print(f"Parameters loaded from: {param_file_path}")
+
+# Initialize Pygame screen and clock AFTER potential FPS change from params
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 clock = pygame.time.Clock()
 pygame.event.set_grab(True)
@@ -1347,6 +1482,12 @@ screen.fill("white")
 
 background = Environment(MAP_SIZE, sim)
 sim.add_background(background)
+
+if args.batch and args.mapfile:
+    background.load_map_from_file(args.mapfile, MAP_SIZE)
+else:
+    # Procedural generation if not batch mode or mapfile not specified (though batch implies it)
+    background.generate_background_texture(MAP_SIZE)
 
 sim.add_objs(background.maparr)
 
