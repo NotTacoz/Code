@@ -667,7 +667,7 @@ class Simulation():
             i = 0 # counter
             for comb_centre in self.selected_hive.combs:
                 honey = self.selected_hive.combs_honey[math.floor(i/COMB_WIDTH), i % COMB_WIDTH]
-                if honey >= 0: # does not draw invalid combs (-1)
+                if honey > 0: # does not draw invalid combs (-1)
                     col.hsla =((20+40*honey/100, 100, 50*honey/100+15, 100))
                     h_pos = hivepos2screen(pygame.Vector2(comb_centre))
                     pygame.draw.circle(screen, (col.r, col.g, col.b), h_pos, 10)
@@ -1028,13 +1028,15 @@ class Creature():
 
         Moreover, it isnt really true to real life animal behaviour - animals rarely calculate the most "optimal" direction when heading towards an object, 
         as animals are incapable of storing the position of their target object and every obstacle in their path."""
-        # if frames == 1:
+        # uncomment below for a* pathfind to a random location visualised
+        # if manager.frames == 1:
         #     # get a non water pos
         #     random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
         #     while manager.background.maparr[int(random_pos.x), int(random_pos.y)] >= BG_WATER_THRESHOLD:
         #         random_pos = pygame.Vector2(random.randint(0,127), random.randint(0,127))
         #
         #     self.a_star_pathfind(manager, self.hive.pos, random_pos)
+
         is_worker = self.role == "worker" # boolean true if worker 
         is_outside = self in self.hive.bees_outside # boolean true if outside
 
@@ -1103,7 +1105,7 @@ class Creature():
             # print(self.energy)
 
         if self.energy <= 0:
-            print("creature ran out of energy :(")
+            # print("creature ran out of energy :(")
             self.closestflower.n_bees -= 1
             if is_outside:
                 self.hive.bees_outside.remove(self)
@@ -1555,6 +1557,7 @@ if args.batch:
 elif args.interactive:
     try:
         print("::::::::::::::::::::::INPUTS::[Interactive Mode]::::::::::::::::::::::")
+        print("Warning: Using extreme values may yield unexpected, untested and unaccounted for results. Performance could also be decreased.")
         number_of_bees = int(x) if (x := input(f"Number of bees per hive (default={H_INITIAL_WORKERS}) (1-100): ")) else H_INITIAL_WORKERS
         number_of_bees = max(1, min(number_of_bees, 100))
         
