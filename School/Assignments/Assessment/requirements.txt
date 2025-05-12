@@ -1,4 +1,0 @@
-matplotlib==3.10.3
-noise==1.2.2
-numpy==2.2.5
-pygame==2.6.1

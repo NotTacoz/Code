@@ -1,0 +1,12 @@
+## Synopysis
+Bank Account using classes
+
+## files
+accounts.py - class method code
+testaccounts.py - testing the classes and error handling
+
+## package info
+none
+
+## version date
+12-05-25
