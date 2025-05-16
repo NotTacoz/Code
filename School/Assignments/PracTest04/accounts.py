@@ -47,11 +47,8 @@ class Portfolio ():
 
             if temp:
                 print("---> Withdrawing $" + str(amount) + " from account " + name)
-                if amount <= temp.bal:
-                    temp.withdraw(amount)
-                    print("         Complete")
-                else:
-                    raise InsufficientFundsError(f'Exception: Withdrawl ${amount} Exceeds Balance ${temp.bal}')
+                temp.withdraw(amount)
+                print("         Complete")
 
 
     def balances(self):
@@ -96,7 +93,11 @@ class BankAccount ():
         self.bal = balance
 
     def withdraw(self, amount):
+        if self.bal <= amount:
             self.bal = self.bal - amount
+        else:
+            raise InsufficientFundsError(f'Exception: Withdrawl ${amount} Exceeds Balance ${self.bal}')
+
 
     def deposit(self, amount):
         self.bal = self.bal + amount
